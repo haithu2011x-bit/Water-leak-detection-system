@@ -79,7 +79,7 @@ class DetectionGateTests(unittest.TestCase):
 
     def test_three_consecutive_anomalies_required(self):
         from ai.features import FEATURES
-        meta=dict(features=FEATURES,threshold=0.55,baseline={
+        meta=dict(features=FEATURES,threshold=0.55,provenance="real_operator_confirmed",baseline={
             'residual':{'median':0,'std':0.01},
             'z1':{'median':0.6,'std':0.01},
             'z2':{'median':0.4,'std':0.01}})
