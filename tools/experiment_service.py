@@ -11,6 +11,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from tools.experiment_log import SCENARIOS, CREATE_SQL
+from tools.detection_guard import DEVICE_ID, sample_reasons
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_DB = ROOT / "data" / "water.db"
@@ -52,37 +53,19 @@ def _time(s):
 
 
 def _recent_stream_check(con, now=None):
-    """Heuristic only: confirms fresh packets match ESP32 data CONTRACT, not physical provenance."""
+    """Require v2 metadata and consecutive recent packets; still NOT device authentication."""
     now = now or utc_now()
+    cols = {r[1] for r in con.execute("PRAGMA table_info(telemetry)")}
+    if not {"device_id", "boot_id", "seq"} <= cols:
+        return False, ["Cần chạy Collector v2 để có device_id/boot_id/seq."], []
     rows = con.execute("""SELECT id, ts_server, ts_ms, flow_main, flow_z1, flow_z2,
-      COALESCE(label,'') AS label, COALESCE(scenario_id,'') AS scenario_id
-      FROM telemetry ORDER BY id DESC LIMIT 5""").fetchall()
-    messages = []
+        COALESCE(label,'') AS label, COALESCE(scenario_id,'') AS scenario_id,
+        device_id,boot_id,seq FROM telemetry ORDER BY id DESC LIMIT 5""").fetchall()
     if len(rows) < 3:
-        return False, ["Cần ít nhất 3 bản tin mới liên tiếp từ ESP32."], rows
-    parsed = []
-    for r in reversed(rows):
-        t = _time(r["ts_server"])
-        if t is None:
-            messages.append(f"Bản ghi #{r['id']}: thời gian server không hợp lệ.")
-        else:
-            parsed.append(t)
-        if type(r["ts_ms"]) is not int or not 0 <= r["ts_ms"] < 2**32:
-            messages.append(f"Bản ghi #{r['id']}: ts_ms không có dạng uptime uint32 ESP32.")
-        if r["scenario_id"] or r["label"]:
-            messages.append(f"Bản ghi #{r['id']}: có nhãn/kịch bản (có thể là dữ liệu giả).")
-        for k in FLOW_KEYS:
-            v = r[k]
-            if not isinstance(v, (int, float)) or not math.isfinite(v) or v < 0:
-                messages.append(f"Bản ghi #{r['id']}: {k} không hợp lệ.")
-    if len(parsed) == len(rows):
-        age = (now - parsed[-1]).total_seconds()
-        if age < -3 or age > 12:
-            messages.append(f"Chưa có dữ liệu mới (mẫu cuối cách hiện tại {age:.1f} giây).")
-        if any((b-a).total_seconds() <= 0 or (b-a).total_seconds() > 8
-               for a, b in zip(parsed[:-1], parsed[1:])):
-            messages.append("Bản tin cuối có khoảng thời gian không liên tục (>8s), trùng hoặc đảo thứ tự.")
-    return not messages, messages, rows
+        return False, ["Cần ít nhất 3 bản tin ESP32 v2 mới liên tiếp."], rows
+    chronological = [dict(r) for r in reversed(rows)]
+    errors = sample_reasons(chronological, now=now, minimum=len(chronological))
+    return not errors, errors, rows
 
 
 def stream_status(db=DEFAULT_DB, now=None):
