@@ -67,8 +67,9 @@ class TestExperimentService(unittest.TestCase):
         self.add_records()
         sid = start_session('N1', 'Kiểm tra bộ xuất', confirm_real=True, db=self.db)
         with closing(sqlite3.connect(self.db)) as con, con:
-            con.execute("""INSERT INTO telemetry (ts_server,ts_ms,flow_main,flow_z1,flow_z2)
-              VALUES (?,?,?,?,?)""", (utc_now().isoformat(timespec='microseconds'), 20000, 0.9, 0.5, 0.4))
+            con.execute("""INSERT INTO telemetry (ts_server,ts_ms,flow_main,flow_z1,flow_z2,device_id,boot_id,seq)
+              VALUES (?,?,?,?,?,?,?,?)""", (utc_now().isoformat(timespec='microseconds'), 15000, 0.9, 0.5, 0.4,
+              'water-node-01', '0123456789abcdef', 5))
         stop_session('OK', db=self.db)
         csv_bytes = export_verified_session_csv(db=self.db, session_id=sid)
         self.assertIn(b'real_operator_confirmed', csv_bytes)
@@ -79,8 +80,9 @@ class TestExperimentService(unittest.TestCase):
         self.add_records()
         sid = start_session('N1', 'Kiểm tra chặn fake', confirm_real=True, db=self.db)
         with closing(sqlite3.connect(self.db)) as con, con:
-            con.execute("""INSERT INTO telemetry (ts_server,ts_ms,flow_main,flow_z1,flow_z2,label,scenario_id)
-              VALUES (?,?,?,?,?,?,?)""", (utc_now().isoformat(timespec='microseconds'), 21000, 0.9, 0.5, 0.4, 'normal', 'normal'))
+            con.execute("""INSERT INTO telemetry (ts_server,ts_ms,flow_main,flow_z1,flow_z2,label,scenario_id,device_id,boot_id,seq)
+              VALUES (?,?,?,?,?,?,?,?,?,?)""", (utc_now().isoformat(timespec='microseconds'), 15000, 0.9, 0.5, 0.4, 'normal', 'normal',
+              'water-node-01', '0123456789abcdef', 5))
         stop_session('OK', db=self.db)
         with self.assertRaises(ValueError):
             export_verified_session_csv(db=self.db, session_id=sid)
