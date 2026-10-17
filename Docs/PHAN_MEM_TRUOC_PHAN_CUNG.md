@@ -104,3 +104,14 @@ Sau khi hoàn tất hiệu chuẩn/thu thập đo thật:
 ## An toàn trước khi bảo vệ đồ án
 
 Trình bày rõ **chức năng đã lập trình** và **chức năng đã thử nghiệm vật lý**. Chưa thể nói phát hiện sớm, định vị chính xác, hoặc đo precision/recall thực tế trước giai đoạn thử nghiệm và hiệu chuẩn.
+
+## Watchdog mất kết nối (không phải cảnh báo rò rỉ)
+
+Sau khi đã có ESP32 thật và phiên `runtime_arming.json` hợp lệ, có thể giám sát mất bản tin bằng một tiến trình khác:
+
+```powershell
+.\.venv\Scripts\python.exe tools\device_health.py --mode check
+.\.venv\Scripts\python.exe tools\device_health.py --mode watch
+```
+
+Nếu mẫu cuối cũ hơn 20 giây, watchdog tạo một sự kiện `telemetry_offline` có ID ổn định để Alert Engine chống trùng. Không chạy watchdog này mặc định khi khởi động Dashboard/Collector; nếu chưa có phê duyệt vận hành thật thì nó không tạo cảnh báo. Khi truyền thông khôi phục, người vận hành cần kiểm tra và đóng cảnh báo theo quy trình. Mất telemetry không có nghĩa là rò rỉ.
