@@ -1,0 +1,17 @@
+run_id,phase,flow_path,sensor_id,volume_ml,pulses_start,pulses_end,duration_sec,notes
+CAL01,CAL,Z1_ONLY,MAIN,,,,,Nhánh Z1 mở, Z2 đóng; cùng bình nước cho MAIN và Z1
+CAL01,CAL,Z1_ONLY,Z1,,,,,Nhánh Z1 mở, Z2 đóng
+CAL02,CAL,Z1_ONLY,MAIN,,,,,Đo lặp, bình đo ở outlet Z1
+CAL02,CAL,Z1_ONLY,Z1,,,,,Đo lặp
+CAL03,CAL,Z1_ONLY,MAIN,,,,,Đo lặp
+CAL03,CAL,Z1_ONLY,Z1,,,,,Đo lặp
+CAL04,CAL,Z2_ONLY,MAIN,,,,,Nhánh Z2 mở, Z1 đóng
+CAL04,CAL,Z2_ONLY,Z2,,,,,Nhánh Z2 mở, Z1 đóng
+CAL05,CAL,Z2_ONLY,MAIN,,,,,Đo lặp
+CAL05,CAL,Z2_ONLY,Z2,,,,,Đo lặp
+CAL06,CAL,Z2_ONLY,MAIN,,,,,Đo lặp
+CAL06,CAL,Z2_ONLY,Z2,,,,,Đo lặp
+CHECK01,CHECK,Z1_ONLY,MAIN,,,,,Kiểm tra độc lập không đưa vào tính hệ số
+CHECK01,CHECK,Z1_ONLY,Z1,,,,,Kiểm tra độc lập
+CHECK02,CHECK,Z2_ONLY,MAIN,,,,,Kiểm tra độc lập
+CHECK02,CHECK,Z2_ONLY,Z2,,,,,Kiểm tra độc lập
