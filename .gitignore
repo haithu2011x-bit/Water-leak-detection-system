@@ -1,5 +1,26 @@
+# Virtual environments and Python caches
 .venv/
+venv/
 __pycache__/
-*.pyc
-*.pyo
-Tools/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+
+# Local settings and secrets
+.env
+.env.*
+!.env.example
+.vscode/
+
+# Local data and generated outputs
+/data/*.db
+/data/*.db-*
+/data/*.sqlite*
+/data/quality/*.csv
+/ai/*.joblib
+/ai/*_meta.json
+
+# Office temporary files and OS artifacts
+Docs/~$*
+Thumbs.db
+.DS_Store
