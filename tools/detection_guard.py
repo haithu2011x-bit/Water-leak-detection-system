@@ -149,4 +149,6 @@ def model_meta_reasons(meta, expected_features):
         problems.append("Nguong AI khong hop le.")
     if not isinstance(meta.get("baseline"), dict):
         problems.append("Thieu baseline duoc kiem chung.")
+    if meta.get("provenance") != "real_operator_confirmed":
+        problems.append("Metadata khong khai bao nguon du lieu thuc da duoc nguoi van hanh xac nhan.")
     return problems
