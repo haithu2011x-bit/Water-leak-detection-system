@@ -1,48 +1,46 @@
-# Đặc tả giao tiếp dữ liệu — phiên bản flow-only v1
+# MQTT v2 — ESP32 with three YF-S401 flow sensors
 
-## Phạm vi cố định
+This document replaces the obsolete v1 contract. Also see [CHUAN_DU_LIEU_V2.md](CHUAN_DU_LIEU_V2.md).
 
-- 1 ESP32-WROOM-32, 3 cảm biến YF-S401: Main / Zone 1 / Zone 2.
-- **Không có pressure sensor.** Máy bơm DC định mức ~2 L/phút.
-- Dải đo YF-S401 người thực hiện đã kiểm tra: **0,3–6 L/phút**; dữ liệu đo ngoài dải không được coi là chính xác nếu chưa kiểm chứng.
-- Không dùng cảm biến phụ để đo nhu cầu sử dụng hợp lệ; chỉ có 3 flow — cần công bố giới hạn phân biệt leak với demand.
+Hardware: ESP32-WROOM-32D, Main / Zone 1 / Zone 2 YF-S401, **no pressure sensor**. Nominal flow range 0.3–6 L/min. Readings 0 < flow < 0.3 are below rated range and cannot be treated as reliable flow measurements.
 
-## MQTT
+MQTT topic: `building/water/node1/telemetry`, ~1 sample/second, QoS 0. Laptop Mosquitto usually listens on TCP 1883 in a trusted LAN. ESP32 uses the **laptop LAN IP**, not localhost. Do not expose the broker on the Internet without authentication/network protections.
 
-- Topic giữ nguyên để tương thích code đang chạy: `building/water/node1/telemetry`
-- Broker: Mosquitto trên laptop, trong LAN; port 1883 khi test cục bộ. Khi kết nối qua Wi-Fi từ ESP32, dùng **IP LAN của laptop**, không dùng localhost, và cấu hình listener/firewall phù hợp; không mở broker ra Internet.
-- Nhịp gửi mục tiêu: **một bản tin/giây**; lưu thời điểm nhận tại server để kiểm tra delay/gap.
-- JSON tối thiểu, hợp đồng dữ liệu cho firmware ESP32 trong tương lai:
+Example `Docs/mqtt_packet_example.json`:
 
-```json
-{"ts_ms": 152350, "flow_main": 1.2, "flow_z1": 0.7, "flow_z2": 0.5}
-```
+~~~json
+{
+  "device_id":"water-node-01",
+  "boot_id":"0123456789abcdef",
+  "seq":12,
+  "ts_ms":152350,
+  "flow_main":1.2,
+  "flow_z1":0.7,
+  "flow_z2":0.5
+}
+~~~
 
-Trong đó:
-- `ts_ms`: thời gian kể từ khi ESP32 khởi động (`millis()`), **không phải UNIX epoch**. Hiện `fake_sensor.py` cũ dùng Unix milliseconds; KHÔNG dựa vào trường này để gán nhãn. `ts_server` do `collector.py` tạo là thời gian UTC của server.
-- `flow_main`, `flow_z1`, `flow_z2`: đơn vị **L/phút**, số hữu hạn >= 0, dấu thập phân `.`.
-- Không phát `pressure_mv`, không đẩy `label` hay `scenario` từ firmware thật. Việc gán nhãn do **nhật ký thí nghiệm** ghi lại.
-- Có thể mở rộng `device_id`, `sequence`, `firmware_version`, `pulse_main`, `pulse_z1`, `pulse_z2` sau này; `collector.py` hiện tại chỉ lưu các trường có sẵn. Những trường bổ sung chưa phải điều kiện bắt buộc.
+- `flow_*`: finite L/min >= 0; zero is allowed. Positive values below 0.3 or above 6 are outside the manufacturer's stated nominal measurement range.
+- `ts_ms`: ESP32 `millis()` uptime as uint32; NOT Unix epoch.
+- `device_id`: logical node ID; `boot_id`: 16 hex characters changed on reboot; `seq`: uint32 incremented for each sample window, even while MQTT is disconnected.
+- Physical ESP32 firmware does NOT send `label`, `scenario`, or `pressure_mv`.
 
-## Kiểm thử JSON ngay (không lưu dữ liệu fake)
+The Collector accepts legacy packets without any of the three v2 fields for historical compatibility. If ANY v2 field is present, all three must be valid. Formatted payloads and diagnostic device IDs are NOT source authentication.
 
-Chạy ở thư mục Project II:
+## Offline-only validation (does not publish or store)
 
-```powershell
-.\.venv\Scripts\python.exe tools\validate_packet.py --file docs\mqtt_packet_example.json
-```
+~~~powershell
+.\.venv\Scripts\python.exe tools\validate_packet.py --file Docs\mqtt_packet_example.json
+~~~
 
-Kết quả `PASS` cho biết đúng định dạng, **không chứng minh cảm biến chính xác**.
+Expected PASS means only schema valid, NOT physical measurement or sender verified.
 
-## SQLite
+## SQLite and experiments
 
-- Giữ nguyên bảng `telemetry`: `id`, `ts_server`, `ts_ms`, `flow_main`, `flow_z1`, `flow_z2`, `label`, `scenario_id` (bảng cũ có `pressure_mv` thì giữ, nhưng **không sử dụng**).
-- Thêm bảng `experiment_sessions` để lưu mốc bắt đầu/kết thúc cùng người vận hành xác nhận nguồn đo **real**. **Không gán nhãn bằng cách sửa trực tiếp telemetry**.
-- Trích xuất dữ liệu theo khoảng thời gian có nhật ký, không trộn fake cũ với mẫu thật.
+`telemetry` contains server UTC timestamp, uptime, three flows, optional legacy label/scenario, device/boot/seq. A historical `pressure_mv` column, if present, remains untouched but unused. `experiment_sessions` records operator-confirmed REAL session windows separately. Never relabel historical simulated telemetry as real by editing database rows.
 
-## Yêu cầu chất lượng đầu vào
+MQTT diagnostics are saved in `data/quality/mqtt_quality_v2.csv`. A jump in sequence means sampled windows were not observed by the subscriber, NOT proof of transport-only MQTT loss.
 
-- Không âm, không NaN/null; kiểm tra lặp bản tin và mất gói theo timestamp server.
-- Giá trị `0 < flow < 0.3` có thể xuất hiện nhưng nằm dưới dải đo đã xác nhận, nên phải đánh dấu *ngoài dải* thay vì coi là định lượng đáng tin cậy.
-- Cân bằng lưu lượng: `main - z1 - z2`; khác 0 không tự động kết luận rò rỉ vì cần xét sai số cảm biến, vị trí điểm rò và trạng thái vận hành.
-- Ngay khi có dữ liệu thật, cần đo/hiệu chuẩn **từng YF-S401**, lưu lại hệ số pulses-per-liter riêng cho 3 cảm biến.
+## Physical and inference limitation
+
+The residual `Main - Zone1 - Zone2` alone does not identify leaks downstream of branch meters: legitimate usage and downstream leaks can increase Main and Zone readings similarly. Zone outputs are suspected zones, NOT verified precise locations without controlled experiments.

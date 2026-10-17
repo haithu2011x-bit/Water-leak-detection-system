@@ -25,7 +25,7 @@ def load_data():
 
 df = load_data()
 if df.empty:
-    st.warning("Chưa có dữ liệu. Chạy collector và fake_sensor trước.")
+    st.warning("Chưa có dữ liệu. Kiểm tra Mosquitto và Collector; không tạo dữ liệu giả để thay thế số đo thật.")
     st.stop()
 
 df["balance_residual"] = df["flow_main"] - df["flow_z1"] - df["flow_z2"]

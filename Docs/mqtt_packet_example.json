@@ -1,4 +1,7 @@
 {
+  "device_id": "water-node-01",
+  "boot_id": "0123456789abcdef",
+  "seq": 12,
   "ts_ms": 152350,
   "flow_main": 1.2,
   "flow_z1": 0.7,

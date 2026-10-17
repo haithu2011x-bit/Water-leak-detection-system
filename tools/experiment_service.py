@@ -3,6 +3,7 @@
 Requires tools/experiment_log.py from the previous Project II package.
 """
 import csv
+from contextlib import closing
 import io
 import math
 import sqlite3
@@ -10,6 +11,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from tools.experiment_log import SCENARIOS, CREATE_SQL
+from tools.detection_guard import DEVICE_ID, sample_reasons
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_DB = ROOT / "data" / "water.db"
@@ -51,41 +53,23 @@ def _time(s):
 
 
 def _recent_stream_check(con, now=None):
-    """Heuristic only: confirms fresh packets match ESP32 data CONTRACT, not physical provenance."""
+    """Require v2 metadata and consecutive recent packets; still NOT device authentication."""
     now = now or utc_now()
+    cols = {r[1] for r in con.execute("PRAGMA table_info(telemetry)")}
+    if not {"device_id", "boot_id", "seq"} <= cols:
+        return False, ["Cần chạy Collector v2 để có device_id/boot_id/seq."], []
     rows = con.execute("""SELECT id, ts_server, ts_ms, flow_main, flow_z1, flow_z2,
-      COALESCE(label,'') AS label, COALESCE(scenario_id,'') AS scenario_id
-      FROM telemetry ORDER BY id DESC LIMIT 5""").fetchall()
-    messages = []
+        COALESCE(label,'') AS label, COALESCE(scenario_id,'') AS scenario_id,
+        device_id,boot_id,seq FROM telemetry ORDER BY id DESC LIMIT 5""").fetchall()
     if len(rows) < 3:
-        return False, ["Cần ít nhất 3 bản tin mới liên tiếp từ ESP32."], rows
-    parsed = []
-    for r in reversed(rows):
-        t = _time(r["ts_server"])
-        if t is None:
-            messages.append(f"Bản ghi #{r['id']}: thời gian server không hợp lệ.")
-        else:
-            parsed.append(t)
-        if type(r["ts_ms"]) is not int or not 0 <= r["ts_ms"] < 2**32:
-            messages.append(f"Bản ghi #{r['id']}: ts_ms không có dạng uptime uint32 ESP32.")
-        if r["scenario_id"] or r["label"]:
-            messages.append(f"Bản ghi #{r['id']}: có nhãn/kịch bản (có thể là dữ liệu giả).")
-        for k in FLOW_KEYS:
-            v = r[k]
-            if not isinstance(v, (int, float)) or not math.isfinite(v) or v < 0:
-                messages.append(f"Bản ghi #{r['id']}: {k} không hợp lệ.")
-    if len(parsed) == len(rows):
-        age = (now - parsed[-1]).total_seconds()
-        if age < -3 or age > 12:
-            messages.append(f"Chưa có dữ liệu mới (mẫu cuối cách hiện tại {age:.1f} giây).")
-        if any((b-a).total_seconds() <= 0 or (b-a).total_seconds() > 8
-               for a, b in zip(parsed[:-1], parsed[1:])):
-            messages.append("Bản tin cuối có khoảng thời gian không liên tục (>8s), trùng hoặc đảo thứ tự.")
-    return not messages, messages, rows
+        return False, ["Cần ít nhất 3 bản tin ESP32 v2 mới liên tiếp."], rows
+    chronological = [dict(r) for r in reversed(rows)]
+    errors = sample_reasons(chronological, now=now, minimum=len(chronological))
+    return not errors, errors, rows
 
 
 def stream_status(db=DEFAULT_DB, now=None):
-    with db_connect(db) as con:
+    with closing(db_connect(db)) as con, con:
         setup_schema(con)
         valid, messages, rows = _recent_stream_check(con, now)
     return {"ready": valid, "reasons": messages,
@@ -94,7 +78,7 @@ def stream_status(db=DEFAULT_DB, now=None):
 
 
 def summary(db=DEFAULT_DB):
-    with db_connect(db) as con:
+    with closing(db_connect(db)) as con, con:
         setup_schema(con)
         total = con.execute("SELECT COUNT(*) FROM telemetry").fetchone()[0]
         legacy = con.execute("SELECT COUNT(*) FROM telemetry WHERE COALESCE(scenario_id,'') != ''").fetchone()[0]
@@ -106,7 +90,7 @@ def summary(db=DEFAULT_DB):
 
 
 def list_sessions(db=DEFAULT_DB, limit=100):
-    with db_connect(db) as con:
+    with closing(db_connect(db)) as con, con:
         setup_schema(con)
         rows = con.execute("SELECT * FROM experiment_sessions ORDER BY id DESC LIMIT ?", (int(limit),)).fetchall()
     return [dict(r) for r in rows]
@@ -118,7 +102,7 @@ def start_session(code, note, confirm_real=False, db=DEFAULT_DB, now=None):
         raise ValueError(f"Mã kịch bản không hợp lệ: {code}")
     if not confirm_real:
         raise ValueError("Bạn phải xác nhận đã ngừng fake_sensor và chỉ đang đo từ ESP32 thật.")
-    with db_connect(db) as con:
+    with closing(db_connect(db)) as con, con:
         setup_schema(con)
         con.execute("BEGIN IMMEDIATE")
         if con.execute("SELECT 1 FROM experiment_sessions WHERE end_utc IS NULL LIMIT 1").fetchone():
@@ -136,7 +120,7 @@ def start_session(code, note, confirm_real=False, db=DEFAULT_DB, now=None):
 
 
 def stop_session(note="", db=DEFAULT_DB, now=None):
-    with db_connect(db) as con:
+    with closing(db_connect(db)) as con, con:
         setup_schema(con)
         con.execute("BEGIN IMMEDIATE")
         active = con.execute("SELECT id, start_utc FROM experiment_sessions WHERE end_utc IS NULL ORDER BY id DESC LIMIT 1").fetchone()
@@ -165,7 +149,7 @@ def _where_for_session(session):
 
 def sample_rows(db=DEFAULT_DB, session_id=None, limit=1500):
     limit = min(max(int(limit), 1), 10000)
-    with db_connect(db) as con:
+    with closing(db_connect(db)) as con, con:
         setup_schema(con)
         where, args = "1=1", ()
         if session_id is not None:
@@ -201,30 +185,57 @@ def session_quality(db=DEFAULT_DB, session_id=None):
 
 
 def export_verified_session_csv(db=DEFAULT_DB, session_id=None):
-    """Only completed, operator-confirmed, flow-only session; won't silently mix old fake labels."""
-    with db_connect(db) as con:
+    """Only completed operator-confirmed v2 session; NEVER auto-assert physical source."""
+    with closing(db_connect(db)) as con, con:
         setup_schema(con)
         sess = _session(con, session_id)
         if sess["source"] != "real" or sess["end_utc"] is None:
             raise ValueError("Chỉ xuất CSV cho phiên REAL đã kết thúc.")
+        available = {c[1] for c in con.execute("PRAGMA table_info(telemetry)")}
+        if not {"device_id", "boot_id", "seq"} <= available:
+            raise ValueError("Không thể xuất REAL: bảng telemetry chưa có metadata ESP32 v2.")
         where, args = _where_for_session(sess)
         rows = con.execute("""SELECT id, ts_server, ts_ms, flow_main, flow_z1, flow_z2,
+            device_id, boot_id, seq,
             COALESCE(label,'') AS original_label, COALESCE(scenario_id,'') AS original_scenario
             FROM telemetry WHERE """ + where + " ORDER BY id", args).fetchall()
     if not rows:
         raise ValueError("Phiên chưa có dữ liệu cảm biến.")
     output = io.StringIO()
-    columns = ["id", "ts_server", "ts_ms", *FLOW_KEYS, "label", "scenario_id", "zone", "experiment_id", "source"]
+    columns = ["id", "ts_server", "ts_ms", "device_id", "boot_id", "seq",
+               *FLOW_KEYS, "label", "scenario_id", "zone", "experiment_id", "source"]
     writer = csv.DictWriter(output, fieldnames=columns)
     writer.writeheader()
+    first_boot, previous = None, None
     for r in rows:
         if r["original_scenario"] or r["original_label"]:
-            raise ValueError(f"Có bản ghi #{r['id']} mang nhãn/kịch bản cũ. Không xuất dưới tên dữ liệu thật.")
+            raise ValueError(f"#{r['id']} có nhãn giả lập/lịch sử. Không xuất REAL.")
+        if r["device_id"] != DEVICE_ID or not isinstance(r["boot_id"], str) or len(r["boot_id"]) != 16 or any(
+                ch not in "0123456789abcdefABCDEF" for ch in r["boot_id"]):
+            raise ValueError(f"#{r['id']}: thiếu định danh ESP32 v2 hợp lệ.")
+        if type(r["seq"]) is not int or not 0 <= r["seq"] < 2**32:
+            raise ValueError(f"#{r['id']}: seq không hợp lệ.")
         if type(r["ts_ms"]) is not int or not 0 <= r["ts_ms"] < 2**32:
-            raise ValueError(f"Bản ghi #{r['id']} không dùng timestamp uptime ESP32.")
-        if any(not isinstance(r[k], (int, float)) or not math.isfinite(r[k]) or r[k] < 0 for k in FLOW_KEYS):
-            raise ValueError(f"Bản ghi #{r['id']} có lưu lượng lỗi.")
-        writer.writerow({**{k: r[k] for k in ("id", "ts_server", "ts_ms", *FLOW_KEYS)},
+            raise ValueError(f"#{r['id']}: thời gian uptime ESP32 không hợp lệ.")
+        if any(type(r[k]) not in (int, float) or not math.isfinite(r[k]) or r[k] < 0
+               or r[k] > 6.0 or (0 < r[k] < 0.3) for k in FLOW_KEYS):
+            raise ValueError(f"#{r['id']}: lưu lượng ngoài dải cảm biến hoặc lỗi.")
+        stamp = _time(r["ts_server"])
+        if stamp is None:
+            raise ValueError(f"#{r['id']}: thời gian server lỗi.")
+        first_boot = first_boot or r["boot_id"]
+        if r["boot_id"] != first_boot:
+            raise ValueError("Phiên chứa nhiều lần khởi động ESP32; tách phiên trước khi xuất.")
+        if previous is not None:
+            prev_row, prev_stamp = previous
+            if r["id"] != prev_row["id"] + 1 or r["seq"] != (prev_row["seq"] + 1) % (2**32):
+                raise ValueError("Phiên có mẫu thiếu/trùng/đảo thứ tự; phải đánh giá lại.")
+            uptime_gap = (r["ts_ms"] - prev_row["ts_ms"]) % (2**32)
+            if not 500 <= uptime_gap <= 2500 or not 0.5 <= (stamp - prev_stamp).total_seconds() <= 2.5:
+                raise ValueError("Phiên có gián đoạn chu kỳ hoặc thời gian không liên tục.")
+        writer.writerow({**{k: r[k] for k in ("id", "ts_server", "ts_ms", "device_id",
+                          "boot_id", "seq", *FLOW_KEYS)},
                          "label": sess["label"], "scenario_id": sess["scenario_code"], "zone": sess["zone"],
                          "experiment_id": sess["id"], "source": "real_operator_confirmed"})
+        previous = (r, stamp)
     return output.getvalue().encode("utf-8-sig")
