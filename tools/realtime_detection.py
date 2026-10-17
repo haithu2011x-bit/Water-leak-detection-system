@@ -140,23 +140,28 @@ def watch(args):
     last_id = None
     streak = 0
     last_boot = None
+    last_seq = None
     print("Runtime safety mode: all gates checked on each poll; Ctrl+C to stop.")
     try:
         while True:
             problems, meta, rows = status(now=datetime.now(timezone.utc))
             if problems:
-                model, streak, last_boot = None, 0, None
+                model, streak, last_boot, last_seq = None, 0, None, None
                 print("NOT READY: " + " | ".join(problems[:3]))
             elif rows:
                 current = rows[-1]
                 if last_id is None:
                     last_id = current["id"]  # never replay historic values on startup
+                    last_seq = current["seq"]
+                    last_boot = current["boot_id"]
                     print("LIVE window armed; waiting for a NEW sample.")
                 elif current["id"] != last_id:
                     last_id = current["id"]
-                    if last_boot != current["boot_id"]:
-                        streak = 0
-                        last_boot = current["boot_id"]
+                    if (last_boot != current["boot_id"] or last_seq is None
+                            or current["seq"] != (last_seq + 1) % (2**32)):
+                        streak = 0  # skipped/reordered samples cannot count as consecutive anomalies
+                    last_boot = current["boot_id"]
+                    last_seq = current["seq"]
                     try:
                         if model is None:
                             model = joblib.load(MODEL)  # approval hash already checked
@@ -178,7 +183,7 @@ def watch(args):
 def main():
     parser = argparse.ArgumentParser(description="Fail-closed Project II AI detector")
     parser.add_argument("--mode", choices=("check","watch"), default="check")
-    parser.add_argument("--interval", type=float, default=2.0)
+    parser.add_argument("--interval", type=float, default=0.5)
     args = parser.parse_args()
     if not 0.5 <= args.interval <= 60:
         parser.error("interval must be 0.5..60s")
