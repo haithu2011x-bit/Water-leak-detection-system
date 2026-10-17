@@ -43,6 +43,18 @@ if latest:
 else:
     st.info("Chưa có bản ghi đo trong SQLite.")
 
+st.subheader("Trạng thái AI / cảnh báo rò rỉ")
+from tools.realtime_detection import artifacts_ready
+reasons, _ = artifacts_ready()
+if reasons:
+    st.warning("AI chưa được phép phát cảnh báo rò rỉ (đúng trạng thái khi chưa có phần cứng).")
+    with st.expander("Điều kiện còn thiếu"):
+        for issue in reasons:
+            st.write("- " + issue)
+else:
+    st.success("Tệp phê duyệt mô hình và phiên arming hợp lệ. Vẫn phải kiểm tra dữ liệu cảm biến mới trong pipeline.")
+st.caption("Không tự khởi động AI từ giao diện. Bản tin mới không chứng minh nguồn vật lý.")
+
 st.subheader("Dữ liệu lịch sử — chưa xác minh nguồn")
 if st.checkbox("Cho phép xem dữ liệu lịch sử (không dùng làm bằng chứng thực nghiệm)"):
     data = pd.DataFrame(recent_history(DEFAULT_DB, limit=300))
