@@ -57,3 +57,26 @@ Dữ liệu giả lập, mô hình huấn luyện demo và kết quả đánh gi
 `data/water.db`, dữ liệu giám sát, mô hình `.joblib`, file `.env` và các khóa/mật khẩu cá nhân không đưa vào Git. SQLite sẽ được tạo/cập nhật bởi chương trình khi chạy; các bài kiểm thử phần lớn sử dụng cơ sở dữ liệu tạm, không cần sao chép bộ dữ liệu giả lập cũ.
 
 Tài liệu chi tiết xem trong `Docs/`.
+
+
+## Bản phần mềm tích hợp trước phần cứng
+
+**Hướng dẫn chuẩn mới:** [Docs/PHAN_MEM_TRUOC_PHAN_CUNG.md](Docs/PHAN_MEM_TRUOC_PHAN_CUNG.md).
+
+Sau khi cài đặt thư viện và bật Mosquitto trên máy, có thể khởi động Collector + Dashboard hợp nhất + monitor chất lượng MQTT bằng một lệnh:
+
+```powershell
+.\.venv\Scripts\python.exe tools\run_local.py --port 8501 --monitor
+```
+
+Dashboard hợp nhất gồm Tổng quan, biểu đồ lưu lượng, chất lượng MQTT, quản lý thí nghiệm, Alert Engine. Các giao diện Streamlit riêng trước đây vẫn được giữ để tương thích ngược. Nếu cổng 8501 đang bị dùng, đóng ứng dụng trước hoặc chạy `--port 8504`.
+
+### Bảo vệ kết quả đồ án
+
+- **Không có phần cứng = không có phép đo hiệu suất thực**. Mô hình Isolation Forest demo trong lịch sử không được phép tạo cảnh báo vận hành thực.
+- `tools/realtime_detection.py --mode check` dùng để kiểm tra các điều kiện kích hoạt; trước khi hiệu chuẩn và phê duyệt thật, kết quả **NOT READY** là đúng.
+- `ai/train_real.py` và `ai/evaluate_real.py` chỉ chạy sau khi có các CSV phiên đo thật, độc lập; không tự phê duyệt mô hình.
+- `tools/backup_sqlite.py` sao lưu nhất quán, không xóa hay ghi đè database cũ.
+- GitHub Actions tự kiểm thử Windows/Linux, Python 3.13; thử nghiệm vật lý và đánh giá khả năng định vị vẫn là bước bắt buộc.
+
+Các file phê duyệt thực tế và cấu hình kích hoạt được bỏ qua bằng `.gitignore`; chỉ các bản `.example.json` an toàn được đưa lên Git.
