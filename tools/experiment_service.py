@@ -185,30 +185,57 @@ def session_quality(db=DEFAULT_DB, session_id=None):
 
 
 def export_verified_session_csv(db=DEFAULT_DB, session_id=None):
-    """Only completed, operator-confirmed, flow-only session; won't silently mix old fake labels."""
+    """Only completed operator-confirmed v2 session; NEVER auto-assert physical source."""
     with closing(db_connect(db)) as con, con:
         setup_schema(con)
         sess = _session(con, session_id)
         if sess["source"] != "real" or sess["end_utc"] is None:
             raise ValueError("Chỉ xuất CSV cho phiên REAL đã kết thúc.")
+        available = {c[1] for c in con.execute("PRAGMA table_info(telemetry)")}
+        if not {"device_id", "boot_id", "seq"} <= available:
+            raise ValueError("Không thể xuất REAL: bảng telemetry chưa có metadata ESP32 v2.")
         where, args = _where_for_session(sess)
         rows = con.execute("""SELECT id, ts_server, ts_ms, flow_main, flow_z1, flow_z2,
+            device_id, boot_id, seq,
             COALESCE(label,'') AS original_label, COALESCE(scenario_id,'') AS original_scenario
             FROM telemetry WHERE """ + where + " ORDER BY id", args).fetchall()
     if not rows:
         raise ValueError("Phiên chưa có dữ liệu cảm biến.")
     output = io.StringIO()
-    columns = ["id", "ts_server", "ts_ms", *FLOW_KEYS, "label", "scenario_id", "zone", "experiment_id", "source"]
+    columns = ["id", "ts_server", "ts_ms", "device_id", "boot_id", "seq",
+               *FLOW_KEYS, "label", "scenario_id", "zone", "experiment_id", "source"]
     writer = csv.DictWriter(output, fieldnames=columns)
     writer.writeheader()
+    first_boot, previous = None, None
     for r in rows:
         if r["original_scenario"] or r["original_label"]:
-            raise ValueError(f"Có bản ghi #{r['id']} mang nhãn/kịch bản cũ. Không xuất dưới tên dữ liệu thật.")
+            raise ValueError(f"#{r['id']} có nhãn giả lập/lịch sử. Không xuất REAL.")
+        if r["device_id"] != DEVICE_ID or not isinstance(r["boot_id"], str) or len(r["boot_id"]) != 16 or any(
+                ch not in "0123456789abcdefABCDEF" for ch in r["boot_id"]):
+            raise ValueError(f"#{r['id']}: thiếu định danh ESP32 v2 hợp lệ.")
+        if type(r["seq"]) is not int or not 0 <= r["seq"] < 2**32:
+            raise ValueError(f"#{r['id']}: seq không hợp lệ.")
         if type(r["ts_ms"]) is not int or not 0 <= r["ts_ms"] < 2**32:
-            raise ValueError(f"Bản ghi #{r['id']} không dùng timestamp uptime ESP32.")
-        if any(not isinstance(r[k], (int, float)) or not math.isfinite(r[k]) or r[k] < 0 for k in FLOW_KEYS):
-            raise ValueError(f"Bản ghi #{r['id']} có lưu lượng lỗi.")
-        writer.writerow({**{k: r[k] for k in ("id", "ts_server", "ts_ms", *FLOW_KEYS)},
+            raise ValueError(f"#{r['id']}: thời gian uptime ESP32 không hợp lệ.")
+        if any(type(r[k]) not in (int, float) or not math.isfinite(r[k]) or r[k] < 0
+               or r[k] > 6.0 or (0 < r[k] < 0.3) for k in FLOW_KEYS):
+            raise ValueError(f"#{r['id']}: lưu lượng ngoài dải cảm biến hoặc lỗi.")
+        stamp = _time(r["ts_server"])
+        if stamp is None:
+            raise ValueError(f"#{r['id']}: thời gian server lỗi.")
+        first_boot = first_boot or r["boot_id"]
+        if r["boot_id"] != first_boot:
+            raise ValueError("Phiên chứa nhiều lần khởi động ESP32; tách phiên trước khi xuất.")
+        if previous is not None:
+            prev_row, prev_stamp = previous
+            if r["id"] != prev_row["id"] + 1 or r["seq"] != (prev_row["seq"] + 1) % (2**32):
+                raise ValueError("Phiên có mẫu thiếu/trùng/đảo thứ tự; phải đánh giá lại.")
+            uptime_gap = (r["ts_ms"] - prev_row["ts_ms"]) % (2**32)
+            if not 500 <= uptime_gap <= 2500 or not 0.5 <= (stamp - prev_stamp).total_seconds() <= 2.5:
+                raise ValueError("Phiên có gián đoạn chu kỳ hoặc thời gian không liên tục.")
+        writer.writerow({**{k: r[k] for k in ("id", "ts_server", "ts_ms", "device_id",
+                          "boot_id", "seq", *FLOW_KEYS)},
                          "label": sess["label"], "scenario_id": sess["scenario_code"], "zone": sess["zone"],
                          "experiment_id": sess["id"], "source": "real_operator_confirmed"})
+        previous = (r, stamp)
     return output.getvalue().encode("utf-8-sig")
