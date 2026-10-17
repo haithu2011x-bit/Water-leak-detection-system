@@ -24,3 +24,14 @@ __pycache__/
 Docs/~$*
 Thumbs.db
 .DS_Store
+
+# Real measurements, backups, calibration, approval/arming files
+/data/backups/
+/data/real_exports/
+/data/**/*.partial
+/data/quality/*.csv
+/config/model_approval.json
+/config/runtime_arming.json
+/ai/*_candidate.joblib
+/ai/*_candidate_meta.json
+Docs/~$*
