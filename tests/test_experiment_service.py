@@ -1,5 +1,6 @@
 """Temporary SQLite tests: NO fake training data, no access to Project II water.db."""
 import sqlite3
+from contextlib import closing
 import tempfile
 import unittest
 from datetime import timedelta
@@ -13,7 +14,7 @@ class TestExperimentService(unittest.TestCase):
     def setUp(self):
         self.t = tempfile.TemporaryDirectory()
         self.db = Path(self.t.name) / "test.db"
-        with sqlite3.connect(self.db) as con:
+        with closing(sqlite3.connect(self.db)) as con, con:
             con.execute("""CREATE TABLE telemetry (id INTEGER PRIMARY KEY AUTOINCREMENT,
                 ts_server TEXT NOT NULL, ts_ms INTEGER, flow_main REAL, flow_z1 REAL,
                 flow_z2 REAL, pressure_mv REAL, label TEXT DEFAULT '', scenario_id TEXT DEFAULT '')""")
@@ -23,7 +24,7 @@ class TestExperimentService(unittest.TestCase):
 
     def add_records(self, labeled=False, epoch=False):
         now = utc_now()
-        with sqlite3.connect(self.db) as con:
+        with closing(sqlite3.connect(self.db)) as con, con:
             for i in range(5):
                 timestamp = (now - timedelta(seconds=5-i)).isoformat(timespec="microseconds")
                 con.execute("""INSERT INTO telemetry
@@ -63,7 +64,7 @@ class TestExperimentService(unittest.TestCase):
     def test_export_checks_real_session_and_does_not_overwrite(self):
         self.add_records()
         sid = start_session('N1', 'Kiểm tra bộ xuất', confirm_real=True, db=self.db)
-        with sqlite3.connect(self.db) as con:
+        with closing(sqlite3.connect(self.db)) as con, con:
             con.execute("""INSERT INTO telemetry (ts_server,ts_ms,flow_main,flow_z1,flow_z2)
               VALUES (?,?,?,?,?)""", (utc_now().isoformat(timespec='microseconds'), 20000, 0.9, 0.5, 0.4))
         stop_session('OK', db=self.db)
@@ -75,7 +76,7 @@ class TestExperimentService(unittest.TestCase):
     def test_export_rejects_fake_inside_session(self):
         self.add_records()
         sid = start_session('N1', 'Kiểm tra chặn fake', confirm_real=True, db=self.db)
-        with sqlite3.connect(self.db) as con:
+        with closing(sqlite3.connect(self.db)) as con, con:
             con.execute("""INSERT INTO telemetry (ts_server,ts_ms,flow_main,flow_z1,flow_z2,label,scenario_id)
               VALUES (?,?,?,?,?,?,?)""", (utc_now().isoformat(timespec='microseconds'), 21000, 0.9, 0.5, 0.4, 'normal', 'normal'))
         stop_session('OK', db=self.db)
@@ -84,7 +85,7 @@ class TestExperimentService(unittest.TestCase):
 
     def test_out_of_band_value_is_counted(self):
         self.add_records()
-        with sqlite3.connect(self.db) as con:
+        with closing(sqlite3.connect(self.db)) as con, con:
             con.execute('UPDATE telemetry SET flow_z1=0.2 WHERE id=2')
         q = session_quality(self.db)
         self.assertEqual(q['below_range_readings'], 1)
