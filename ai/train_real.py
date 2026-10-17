@@ -40,7 +40,7 @@ def load_verified_session(path, normal_only=True):
     if not df["source"].eq(REAL_SOURCE).all():
         raise ValueError(f"{path}: input is not operator-confirmed real-session export")
     allowed={"normal"} if normal_only else {"normal","leak"}
-    if not df["label"].isin(allowed).all():
+    if not df["label"].isin(allowed).all() or df["label"].nunique()!=1:
         raise ValueError(f"{path}: unacceptable or mixed label")
     df["id"]=pd.to_numeric(df["id"],errors="coerce")
     if df["id"].isna().any() or not df["id"].diff().iloc[1:].eq(1).all():
