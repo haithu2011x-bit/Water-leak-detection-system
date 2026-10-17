@@ -3,6 +3,7 @@
 Requires tools/experiment_log.py from the previous Project II package.
 """
 import csv
+from contextlib import closing
 import io
 import math
 import sqlite3
@@ -85,7 +86,7 @@ def _recent_stream_check(con, now=None):
 
 
 def stream_status(db=DEFAULT_DB, now=None):
-    with db_connect(db) as con:
+    with closing(db_connect(db)) as con, con:
         setup_schema(con)
         valid, messages, rows = _recent_stream_check(con, now)
     return {"ready": valid, "reasons": messages,
@@ -94,7 +95,7 @@ def stream_status(db=DEFAULT_DB, now=None):
 
 
 def summary(db=DEFAULT_DB):
-    with db_connect(db) as con:
+    with closing(db_connect(db)) as con, con:
         setup_schema(con)
         total = con.execute("SELECT COUNT(*) FROM telemetry").fetchone()[0]
         legacy = con.execute("SELECT COUNT(*) FROM telemetry WHERE COALESCE(scenario_id,'') != ''").fetchone()[0]
@@ -106,7 +107,7 @@ def summary(db=DEFAULT_DB):
 
 
 def list_sessions(db=DEFAULT_DB, limit=100):
-    with db_connect(db) as con:
+    with closing(db_connect(db)) as con, con:
         setup_schema(con)
         rows = con.execute("SELECT * FROM experiment_sessions ORDER BY id DESC LIMIT ?", (int(limit),)).fetchall()
     return [dict(r) for r in rows]
@@ -118,7 +119,7 @@ def start_session(code, note, confirm_real=False, db=DEFAULT_DB, now=None):
         raise ValueError(f"Mã kịch bản không hợp lệ: {code}")
     if not confirm_real:
         raise ValueError("Bạn phải xác nhận đã ngừng fake_sensor và chỉ đang đo từ ESP32 thật.")
-    with db_connect(db) as con:
+    with closing(db_connect(db)) as con, con:
         setup_schema(con)
         con.execute("BEGIN IMMEDIATE")
         if con.execute("SELECT 1 FROM experiment_sessions WHERE end_utc IS NULL LIMIT 1").fetchone():
@@ -136,7 +137,7 @@ def start_session(code, note, confirm_real=False, db=DEFAULT_DB, now=None):
 
 
 def stop_session(note="", db=DEFAULT_DB, now=None):
-    with db_connect(db) as con:
+    with closing(db_connect(db)) as con, con:
         setup_schema(con)
         con.execute("BEGIN IMMEDIATE")
         active = con.execute("SELECT id, start_utc FROM experiment_sessions WHERE end_utc IS NULL ORDER BY id DESC LIMIT 1").fetchone()
@@ -165,7 +166,7 @@ def _where_for_session(session):
 
 def sample_rows(db=DEFAULT_DB, session_id=None, limit=1500):
     limit = min(max(int(limit), 1), 10000)
-    with db_connect(db) as con:
+    with closing(db_connect(db)) as con, con:
         setup_schema(con)
         where, args = "1=1", ()
         if session_id is not None:
@@ -202,7 +203,7 @@ def session_quality(db=DEFAULT_DB, session_id=None):
 
 def export_verified_session_csv(db=DEFAULT_DB, session_id=None):
     """Only completed, operator-confirmed, flow-only session; won't silently mix old fake labels."""
-    with db_connect(db) as con:
+    with closing(db_connect(db)) as con, con:
         setup_schema(con)
         sess = _session(con, session_id)
         if sess["source"] != "real" or sess["end_utc"] is None:
