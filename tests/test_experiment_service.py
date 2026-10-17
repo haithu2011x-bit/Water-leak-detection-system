@@ -17,7 +17,8 @@ class TestExperimentService(unittest.TestCase):
         with closing(sqlite3.connect(self.db)) as con, con:
             con.execute("""CREATE TABLE telemetry (id INTEGER PRIMARY KEY AUTOINCREMENT,
                 ts_server TEXT NOT NULL, ts_ms INTEGER, flow_main REAL, flow_z1 REAL,
-                flow_z2 REAL, pressure_mv REAL, label TEXT DEFAULT '', scenario_id TEXT DEFAULT '')""")
+                flow_z2 REAL, pressure_mv REAL, label TEXT DEFAULT '', scenario_id TEXT DEFAULT '',
+                device_id TEXT, boot_id TEXT, seq INTEGER)""")
 
     def tearDown(self):
         self.t.cleanup()
@@ -28,10 +29,11 @@ class TestExperimentService(unittest.TestCase):
             for i in range(5):
                 timestamp = (now - timedelta(seconds=5-i)).isoformat(timespec="microseconds")
                 con.execute("""INSERT INTO telemetry
-                (ts_server,ts_ms,flow_main,flow_z1,flow_z2,label,scenario_id)
-                VALUES (?,?,?,?,?,?,?)""",
+                (ts_server,ts_ms,flow_main,flow_z1,flow_z2,label,scenario_id,device_id,boot_id,seq)
+                VALUES (?,?,?,?,?,?,?,?,?,?)""",
                 (timestamp, 1_700_000_000_000+i*1000 if epoch else 10000+i*1000,
-                 1.2, 0.7, 0.5, 'leak' if labeled else '', 'leak_z1' if labeled else ''))
+                 1.2, 0.7, 0.5, 'leak' if labeled else '', 'leak_z1' if labeled else '',
+                 'water-node-01', '0123456789abcdef', i))
             con.commit()
 
     def test_no_samples_cannot_start(self):
