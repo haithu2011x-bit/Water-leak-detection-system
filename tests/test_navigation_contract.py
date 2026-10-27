@@ -49,8 +49,12 @@ class NavigationContractTests(unittest.TestCase):
         self.assertTrue((ROOT / "tools" / "experiment_service.py").is_file())
 
     def test_streamlit_minimum_version(self):
-        content = (ROOT / "requirements.txt").read_text(encoding="utf-8")
-        self.assertIn("streamlit>=1.46,<2", content)
+        # Dependencies are declared in the CI workflow (no requirements.txt).
+        workflow = ROOT / ".github" / "workflows" / "projectii-checks.yml"
+        content = workflow.read_text(encoding="utf-8")
+        match = re.search(r"streamlit>=(\d+)\.(\d+),<2", content)
+        self.assertIsNotNone(match, "Missing Streamlit version constraint")
+        self.assertGreaterEqual(tuple(map(int, match.groups())), (1, 46))
 
 if __name__ == "__main__":
     unittest.main()
