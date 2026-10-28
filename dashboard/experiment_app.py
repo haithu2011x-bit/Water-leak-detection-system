@@ -1,4 +1,3 @@
-"""Streamlit UI to view data and manage REAL experiment sessions. No fake generation or AI."""
 import sys
 from pathlib import Path
 
@@ -146,13 +145,3 @@ with tab_history:
             st.warning("Những mẫu dưới đây có thể là dữ liệu giả lập, KHÔNG được dùng làm kết quả thực nghiệm thật.")
             st.dataframe(pd.DataFrame(sample_rows(limit=100)), use_container_width=True, hide_index=True)
 
-with tab_guide:
-    st.markdown("""
-    **Khi chưa có phần cứng:** dùng giao diện này để kiểm tra schema, thao tác xem nhật ký và tài liệu. Không khởi động fake_sensor để tạo phiên REAL.
-
-    **Khi đã có ESP32:** kết nối 3 cảm biến, xác minh mức logic GPIO 3,3 V, hiệu chuẩn, bảo đảm Mosquitto và collector đang nhận dữ liệu; dừng fake_sensor, sau đó tạo và kết thúc các phiên N0–N4, L1–L5, F1.
-
-    **Khi thử nghiệm:** không gộp giai đoạn chuyển van/vòi chưa ổn định vào cùng một nhãn. Không tự coi chênh lệch lưu lượng là rò rỉ; rò sau cảm biến nhánh có thể không phân biệt được với dùng nước hợp lệ.
-
-    **Lưu ý an toàn dữ liệu:** giao diện không có đăng nhập, chỉ nên chạy ở localhost trên laptop của bạn. Backup `data/water.db` định kỳ. Giao diện không sửa bảng `telemetry` và không huấn luyện AI.
-    """)
