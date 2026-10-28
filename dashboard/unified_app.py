@@ -1,8 +1,3 @@
-"""Unified navigation for Project II: existing pages remain separate and reusable.
-
-Streamlit >=1.36 is required for st.Page / st.navigation.
-Run on port 8504 first to leave the three original dashboards untouched.
-"""
 import streamlit as st
 
 st.set_page_config(page_title="Project II | IoT-AI Water Monitor", layout="wide")
