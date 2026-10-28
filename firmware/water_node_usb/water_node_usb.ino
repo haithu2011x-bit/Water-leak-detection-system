@@ -1,7 +1,3 @@
-/* ESP32-WROOM-32D, 3 YF-S401: USB Serial, no Wi-Fi or MQTT.
-   MAIN GPIO27, Zone 1 GPIO26, Zone 2 GPIO25. No pressure sensor.
-   Calibrate all three sensors before reporting L/min; zero values are intentional.
-   Condition sensor signals to 0-3.3V logic; power 12V pump separately. */
 #include <Arduino.h>
 #include <esp_system.h>
 
