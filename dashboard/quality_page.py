@@ -1,4 +1,3 @@
-"""Read-only monitoring of optional CSV produced by monitor_mqtt_live.py."""
 import sys
 from pathlib import Path
 
