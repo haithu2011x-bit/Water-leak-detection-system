@@ -1,4 +1,3 @@
-"""Read-only overview. Fresh SQLite rows do not prove physical ESP32 provenance."""
 import sys
 from pathlib import Path
 
