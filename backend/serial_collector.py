@@ -1,8 +1,3 @@
-"""ESP32 USB Serial -> project SQLite, without Wi-Fi, MQTT, or simulated data.
-
-Only accept unlabeled ESP32 v2-shaped packets. The packet format is not proof of
-physical provenance; experiment records still require operator confirmation.
-"""
 from __future__ import annotations
 
 import argparse
