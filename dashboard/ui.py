@@ -1,107 +1,158 @@
-"""Shared visual system for the Project II Streamlit dashboard."""
+"""Shared, restrained visual language for the Project II monitoring dashboard.
+
+Prefer native Streamlit widgets and accessible, meaningful status text.
+Only use HTML for layout details that Streamlit does not expose directly.
+"""
 from __future__ import annotations
 
 from html import escape
 
 import streamlit as st
 
+# Consistent across overview, history, experiments and quality plots.
+FLOW_COLORS = ("#167a78", "#4779a8", "#b88246")
+RESIDUAL_COLOR = "#786c87"
 
 CSS = """
 <style>
 :root {
-  --ink: #17243b;
-  --muted: #68778f;
-  --line: #e5ebf3;
   --surface: #ffffff;
-  --canvas: #f3f6fb;
-  --navy: #10233f;
-  --blue: #2868d7;
-  --cyan: #18a6b8;
+  --canvas: #f7f9fa;
+  --sidebar: #eef2f3;
+  --ink: #1f2d35;
+  --muted: #586a73;
+  --line: #dce4e7;
+  --accent: #166e71;
 }
-[data-testid="stAppViewContainer"] { background: var(--canvas); color: var(--ink); }
-[data-testid="stHeader"] { background: rgba(243,246,251,.88); }
-.block-container { max-width: 1500px; padding-top: 1.7rem; padding-bottom: 3rem; }
-h1,h2,h3 { color: var(--ink); letter-spacing: -.025em; }
-p, label, [data-testid="stMarkdownContainer"] { color: inherit; }
-[data-testid="stSidebar"] { background: #10233f; border-right: 1px solid #203b5e; }
-[data-testid="stSidebar"] * { color: #e7eef9; }
-[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p { color: #b8c8dd; }
-[data-testid="stSidebar"] hr { border-color: #2a4262; }
-[data-testid="stSidebarNav"] { padding-top: .4rem; }
-[data-testid="stSidebarNav"] a { border-radius: 10px; margin: 3px 7px; }
-[data-testid="stSidebarNav"] a[aria-current="page"] { background: #24466f; }
+[data-testid="stAppViewContainer"] {
+  background: var(--canvas);
+  color: var(--ink);
+}
+[data-testid="stHeader"] { background: rgba(247, 249, 250, .96); }
+.block-container { max-width: 1280px; padding-top: 1.6rem; padding-bottom: 3rem; }
+[data-testid="stSidebar"] {
+  background: var(--sidebar);
+  border-right: 1px solid var(--line);
+}
+[data-testid="stSidebarNav"] { padding-top: .25rem; }
+[data-testid="stSidebarNav"] a {
+  border-radius: 6px;
+  margin: 2px 8px;
+  color: var(--ink);
+}
+[data-testid="stSidebarNav"] a[aria-current="page"] {
+  background: #dcebec;
+  color: #115e63;
+  font-weight: 650;
+}
+[data-testid="stHeading"] h1 {
+  color: var(--ink);
+  font-size: clamp(1.65rem, 2.8vw, 2.1rem);
+  font-weight: 680;
+  letter-spacing: -.025em;
+  line-height: 1.25;
+}
+h2, h3 { color: var(--ink); }
 [data-testid="stMetric"] {
-  background: #fff; border: 1px solid var(--line); border-radius: 15px;
-  padding: 15px 17px; box-shadow: 0 3px 12px rgba(20,45,80,.035);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 14px 16px;
+  box-shadow: none;
 }
-[data-testid="stMetricLabel"] { color: #64748b; font-size: .83rem; }
-[data-testid="stMetricValue"] { color: var(--ink); font-weight: 750; }
-div[data-testid="stButton"] > button, div[data-testid="stDownloadButton"] > button,
+[data-testid="stMetricLabel"] { color: var(--muted); font-size: .83rem; }
+[data-testid="stMetricValue"] { color: var(--ink); font-weight: 650; }
+div[data-testid="stButton"] > button,
+div[data-testid="stDownloadButton"] > button,
 div[data-testid="stFormSubmitButton"] > button {
-  border-radius: 10px; font-weight: 650; min-height: 2.55rem;
-  border: 1px solid #d9e2ee; transition: all .15s ease;
+  border-radius: 6px;
+  border: 1px solid #cbd7db;
+  min-height: 2.45rem;
+  box-shadow: none;
+  font-weight: 550;
 }
 div[data-testid="stButton"] > button[kind="primary"],
 div[data-testid="stFormSubmitButton"] > button[kind="primary"] {
-  background: #2868d7; border-color: #2868d7; color: #fff;
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
 }
-div[data-testid="stButton"] > button:hover, div[data-testid="stDownloadButton"] > button:hover {
-  border-color: #2868d7; color: #2058b8;
+[data-testid="stTabs"] button { font-weight: 550; }
+[data-testid="stDataFrame"],
+[data-testid="stTable"],
+[data-testid="stExpander"],
+[data-testid="stVerticalBlockBorderWrapper"] {
+  border-radius: 8px;
+  border-color: var(--line);
+  box-shadow: none;
 }
-[data-testid="stTabs"] button { font-weight: 650; }
-[data-testid="stDataFrame"], [data-testid="stTable"] { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
-[data-testid="stAlert"] { border-radius: 12px; }
-[data-testid="stExpander"] { background: #fff; border: 1px solid var(--line); border-radius: 12px; }
-[data-testid="stVerticalBlockBorderWrapper"] { background: #fff; border-color: var(--line); border-radius: 16px; }
-div[data-baseweb="select"] > div, div[data-baseweb="input"] > div, textarea {
-  border-radius: 10px !important;
+[data-testid="stAlert"] { border-radius: 6px; }
+div[data-baseweb="select"] > div,
+div[data-baseweb="input"] > div, textarea {
+  border-radius: 6px !important;
 }
-.page-kicker { display:flex; align-items:center; justify-content:space-between; gap:12px; margin:2px 0 5px;
-  color:#2868d7; text-transform:uppercase; letter-spacing:.13em; font-size:.7rem; font-weight:800; }
-.page-kicker-tag { display:inline-block; color:#426080; background:#e8f0fb; border:1px solid #d5e2f4;
-  padding:4px 9px; border-radius:99px; letter-spacing:.04em; font-size:.69rem; }
-.page-summary { background:#eaf2fc; border-left:3px solid #2868d7; color:#526882; border-radius:0 11px 11px 0;
-  padding:12px 15px; margin:0 0 21px; font-size:.9rem; line-height:1.5; }
-[data-testid="stHeading"] h1 { font-size:clamp(1.7rem,3vw,2.25rem); font-weight:800; letter-spacing:-.035em; margin:.1rem 0 .55rem; }
-.hero-shell {
-  position: relative; overflow: hidden; border-radius: 22px; padding: 27px 30px;
-  margin: 0 0 22px; color: #fff;
-  background: linear-gradient(115deg, #102947 0%, #174d7b 57%, #207f99 100%);
-  box-shadow: 0 12px 28px rgba(18,53,88,.13);
+.page-rule {
+  border-bottom: 1px solid var(--line);
+  margin: 1rem 0 1.25rem;
 }
-.hero-shell:after {
-  content: ""; position: absolute; width: 280px; height: 280px; border-radius: 50%;
-  right: -65px; top: -145px; border: 1px solid rgba(255,255,255,.18);
-  box-shadow: 0 0 0 28px rgba(255,255,255,.035), 0 0 0 58px rgba(255,255,255,.025);
+.section-heading {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  column-gap: .85rem;
+  row-gap: .25rem;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: .5rem;
+  margin: 1.75rem 0 .85rem;
 }
-.hero-eyebrow { color: #a9d9ea !important; text-transform: uppercase; letter-spacing: .14em;
-  font-size: .72rem; font-weight: 750; margin: 0 0 9px; }
-.hero-title { color: #fff !important; font-size: clamp(1.65rem, 3vw, 2.35rem);
-  font-weight: 780; letter-spacing: -.04em; line-height: 1.12; margin: 0 0 9px; }
-.hero-subtitle { color: #d4e7f4 !important; max-width: 850px; font-size: .96rem; margin: 0; line-height: 1.55; }
-.hero-tag { display: inline-block; margin-top: 17px; background: rgba(255,255,255,.13);
-  border: 1px solid rgba(255,255,255,.22); padding: 5px 10px; border-radius: 99px;
-  color: #f4fbff !important; font-size: .75rem; font-weight: 650; }
-.section-heading { display: flex; align-items: baseline; gap: 10px; margin: 1.25rem 0 .65rem; }
-.section-heading h3 { font-size: 1.12rem; font-weight: 750; margin: 0; }
-.section-heading span { color: var(--muted); font-size: .82rem; }
-.soft-note { background: #edf5ff; border: 1px solid #d9e9fc; color: #355678;
-  border-radius: 12px; padding: 12px 15px; font-size: .88rem; line-height: 1.5; }
-.status-chip { display: inline-block; border-radius: 99px; padding: 5px 10px; font-size: .76rem; font-weight: 700; }
-.status-good { color: #176b48; background: #e4f6ed; }
-.status-warn { color: #8a5a12; background: #fff2d9; }
-.status-bad { color: #9b3434; background: #fdeaea; }
-.status-neutral { color: #52647c; background: #edf1f6; }
-.empty-state { background: #fff; border: 1px dashed #cbd7e5; border-radius: 16px;
-  padding: 25px; text-align: center; color: #64748b; }
-.empty-state strong { display:block; color: #243650; font-size: 1rem; margin-bottom: 5px; }
-.small-muted { color: #718096; font-size: .8rem; }
-div[data-testid="stPlotlyChart"], div[data-testid="stVegaLiteChart"], div[data-testid="stArrowVegaLiteChart"] {
-  background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 8px;
+.section-heading h2 {
+  margin: 0;
+  font-size: 1.08rem;
+  font-weight: 650;
+  line-height: 1.4;
+  letter-spacing: -.01em;
 }
-@media (max-width: 700px) {
-  .block-container { padding: 1rem .8rem 2rem; }
-  .hero-shell { padding: 22px 20px; border-radius: 16px; }
+.section-heading p {
+  margin: 0;
+  color: var(--muted);
+  font-size: .83rem;
+  line-height: 1.5;
+}
+.empty-state {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 1.25rem 1.4rem;
+}
+.empty-state strong {
+  display: block;
+  color: var(--ink);
+  margin-bottom: .25rem;
+  font-weight: 650;
+}
+.empty-state p { color: var(--muted); margin: 0; font-size: .88rem; }
+.status-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: .5rem;
+  font-size: .9rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+.status-indicator::before {
+  content: "";
+  width: .48rem;
+  height: .48rem;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: #87969d;
+}
+.status-good::before { background: #247b59; }
+.status-warn::before { background: #b17d25; }
+.status-bad::before { background: #b34949; }
+@media (max-width: 768px) {
+  .block-container { padding: 1.15rem .85rem 2rem; }
+  .section-heading { margin-top: 1.3rem; }
 }
 </style>
 """
@@ -111,36 +162,33 @@ def apply_theme() -> None:
     st.markdown(CSS, unsafe_allow_html=True)
 
 
-def page_header(title: str, subtitle: str, eyebrow: str = "PROJECT II · WATER INTELLIGENCE",
-                tag: str | None = None) -> None:
-    tag_html = f'<span class="page-kicker-tag">{escape(tag)}</span>' if tag else ""
-    st.markdown(
-        f'<div class="page-kicker"><span>{escape(eyebrow)}</span>{tag_html}</div>',
-        unsafe_allow_html=True,
-    )
+def page_header(title: str, subtitle: str) -> None:
+    """One consistent title and short descriptive line on every page."""
     st.title(title)
-    st.markdown(
-        f'<div class="page-summary">{escape(subtitle)}</div>',
-        unsafe_allow_html=True,
-    )
+    st.caption(subtitle)
+    st.markdown('<div class="page-rule"></div>', unsafe_allow_html=True)
 
 
 def section_title(title: str, detail: str | None = None) -> None:
-    detail_html = f"<span>{escape(detail)}</span>" if detail else ""
+    detail_html = f"<p>{escape(detail)}</p>" if detail else ""
     st.markdown(
-        f'<div class="section-heading"><h3>{escape(title)}</h3>{detail_html}</div>',
+        f'<div class="section-heading"><h2>{escape(title)}</h2>{detail_html}</div>',
         unsafe_allow_html=True,
     )
 
 
 def empty_state(title: str, message: str) -> None:
     st.markdown(
-        f'<div class="empty-state"><strong>{escape(title)}</strong>{escape(message)}</div>',
+        f'<div class="empty-state"><strong>{escape(title)}</strong>'
+        f'<p>{escape(message)}</p></div>',
         unsafe_allow_html=True,
     )
 
 
 def status_chip(label: str, kind: str = "neutral") -> None:
-    allowed = {"good": "status-good", "warn": "status-warn", "bad": "status-bad"}
-    css = allowed.get(kind, "status-neutral")
-    st.markdown(f'<span class="status-chip {css}">{escape(label)}</span>', unsafe_allow_html=True)
+    """A colored dot only for an operational status, not decorative badges."""
+    css = kind if kind in {"good", "warn", "bad"} else "neutral"
+    st.markdown(
+        f'<span class="status-indicator status-{css}">{escape(label)}</span>',
+        unsafe_allow_html=True,
+    )
