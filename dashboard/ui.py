@@ -56,6 +56,13 @@ div[data-testid="stButton"] > button:hover, div[data-testid="stDownloadButton"] 
 div[data-baseweb="select"] > div, div[data-baseweb="input"] > div, textarea {
   border-radius: 10px !important;
 }
+.page-kicker { display:flex; align-items:center; justify-content:space-between; gap:12px; margin:2px 0 5px;
+  color:#2868d7; text-transform:uppercase; letter-spacing:.13em; font-size:.7rem; font-weight:800; }
+.page-kicker-tag { display:inline-block; color:#426080; background:#e8f0fb; border:1px solid #d5e2f4;
+  padding:4px 9px; border-radius:99px; letter-spacing:.04em; font-size:.69rem; }
+.page-summary { background:#eaf2fc; border-left:3px solid #2868d7; color:#526882; border-radius:0 11px 11px 0;
+  padding:12px 15px; margin:0 0 21px; font-size:.9rem; line-height:1.5; }
+[data-testid="stHeading"] h1 { font-size:clamp(1.7rem,3vw,2.25rem); font-weight:800; letter-spacing:-.035em; margin:.1rem 0 .55rem; }
 .hero-shell {
   position: relative; overflow: hidden; border-radius: 22px; padding: 27px 30px;
   margin: 0 0 22px; color: #fff;
@@ -106,11 +113,14 @@ def apply_theme() -> None:
 
 def page_header(title: str, subtitle: str, eyebrow: str = "PROJECT II · WATER INTELLIGENCE",
                 tag: str | None = None) -> None:
-    tag_html = f'<div class="hero-tag">{escape(tag)}</div>' if tag else ""
+    tag_html = f'<span class="page-kicker-tag">{escape(tag)}</span>' if tag else ""
     st.markdown(
-        f'<section class="hero-shell"><div class="hero-eyebrow">{escape(eyebrow)}</div>'
-        f'<h1 class="hero-title">{escape(title)}</h1>'
-        f'<p class="hero-subtitle">{escape(subtitle)}</p>{tag_html}</section>',
+        f'<div class="page-kicker"><span>{escape(eyebrow)}</span>{tag_html}</div>',
+        unsafe_allow_html=True,
+    )
+    st.title(title)
+    st.markdown(
+        f'<div class="page-summary">{escape(subtitle)}</div>',
         unsafe_allow_html=True,
     )
 
