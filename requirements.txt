@@ -1,0 +1,9 @@
+# Runtime and test dependencies used by the Project II CI workflow.
+# Install with: python -m pip install -r requirements.txt
+paho-mqtt>=2.0,<3
+pandas>=2.2,<3
+numpy>=1.26,<3
+scikit-learn>=1.5,<2
+joblib>=1.3,<2
+streamlit>=1.61,<2
+pyserial>=3.5,<4
