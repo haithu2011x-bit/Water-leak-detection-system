@@ -9,6 +9,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from dashboard.ui import apply_theme, empty_state, page_header, section_title, status_chip
+from dashboard.data_filters import filter_quality_log
 from tools.unified_dashboard_service import age_seconds, quality_log_snapshot
 
 apply_theme()
@@ -91,10 +92,7 @@ with filter_col:
 with search_col:
     query = st.text_input("Tìm trong nhật ký", placeholder="Ví dụ: seq, JSON, timeout, flow_z1")
 
-filtered = df[kinds.isin(selected_kinds)].copy()
-if query.strip():
-    mask = filtered.astype(str).apply(lambda col: col.str.contains(query.strip(), case=False, na=False)).any(axis=1)
-    filtered = filtered[mask]
+filtered = filter_quality_log(df, selected_kinds, query)
 
 if "received_utc" in filtered.columns:
     filtered["received_utc"] = pd.to_datetime(filtered["received_utc"], utc=True, errors="coerce")
