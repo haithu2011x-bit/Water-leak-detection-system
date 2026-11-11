@@ -1,48 +1,121 @@
 import sqlite3
+import sys
 from pathlib import Path
 
 import pandas as pd
 import streamlit as st
 
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from dashboard.ui import apply_theme, empty_state, page_header, section_title
+
 DB = ROOT / "data" / "water.db"
 
-st.set_page_config(page_title="Water Leak Monitor", layout="wide")
-st.title("Water Leak Monitor")
-st.caption("Project II - Hệ thống IoT - AI phát hiện rò rỉ nước")
+apply_theme()
+page_header(
+    "Lưu lượng & lịch sử đo",
+    "Theo dõi biến thiên của đường ống tổng và hai zone, đối chiếu cân bằng lưu lượng và xuất dữ liệu phục vụ phân tích.",
+    tag="TELEMETRY EXPLORER",
+)
 
-@st.cache_data(ttl=2)
-def load_data():
-    if not DB.exists():
+@st.cache_data(ttl=3)
+def load_data(limit: int) -> pd.DataFrame:
+    if not DB.is_file():
         return pd.DataFrame()
     with sqlite3.connect(DB) as con:
-        frame = pd.read_sql_query("""
-            SELECT id, ts_server, flow_main, flow_z1, flow_z2,
-                   label, scenario_id
-            FROM telemetry ORDER BY id DESC LIMIT 600
-        """, con)
-    return frame.sort_values("id")
+        frame = pd.read_sql_query(
+            """
+            SELECT id, ts_server, flow_main, flow_z1, flow_z2, label, scenario_id
+            FROM telemetry ORDER BY id DESC LIMIT ?
+            """,
+            con,
+            params=(int(limit),),
+        )
+    return frame.sort_values("id").reset_index(drop=True)
 
-df = load_data()
+top = st.columns([1, 1, 3])
+with top[0]:
+    row_limit = st.selectbox("Số mẫu tải", [100, 300, 600, 1200, 3000], index=2)
+with top[1]:
+    if st.button("↻ Làm mới dữ liệu", use_container_width=True):
+        st.cache_data.clear()
+        st.rerun()
+
+df = load_data(row_limit)
 if df.empty:
-    st.warning("Chưa có dữ liệu. Kiểm tra Mosquitto và Collector; không tạo dữ liệu giả để thay thế số đo thật.")
+    empty_state("Chưa có telemetry", "Kiểm tra Collector, MQTT broker hoặc kết nối USB Serial. Không dùng dữ liệu giả để thay thế số đo thật.")
     st.stop()
 
-df["balance_residual"] = df["flow_main"] - df["flow_z1"] - df["flow_z2"]
-last = df.iloc[-1]
-c1, c2, c3, c4 = st.columns(4)
-c1.metric("Flow Main (L/min)", f"{last['flow_main']:.2f}")
-c2.metric("Zone 1 (L/min)", f"{last['flow_z1']:.2f}")
-c3.metric("Zone 2 (L/min)", f"{last['flow_z2']:.2f}")
-c4.metric("Residual (L/min)", f"{last['balance_residual']:.2f}")
+df["ts_server"] = pd.to_datetime(df["ts_server"], utc=True, errors="coerce")
+for key in ("flow_main", "flow_z1", "flow_z2"):
+    df[key] = pd.to_numeric(df[key], errors="coerce")
+df = df.dropna(subset=["ts_server", "flow_main", "flow_z1", "flow_z2"]).copy()
+df["residual"] = df["flow_main"] - df["flow_z1"] - df["flow_z2"]
+if df.empty:
+    st.warning("Có bản ghi nhưng không có mẫu hợp lệ để vẽ biểu đồ.")
+    st.stop()
 
-st.caption("Residual = Flow Main - Zone 1 - Zone 2.")
-st.subheader("Lưu lượng gần đây")
-st.line_chart(df.set_index("id")[["flow_main", "flow_z1", "flow_z2"]])
-st.subheader("Chênh lệch cân bằng lưu lượng")
-st.line_chart(df.set_index("id")[["balance_residual"]])
-st.subheader("Dữ liệu mới nhất")
-st.dataframe(df.tail(20).sort_values("id", ascending=False), use_container_width=True)
-if st.button("Refresh"):
-    st.cache_data.clear()
-    st.rerun()
+last = df.iloc[-1]
+metrics = st.columns(4)
+metrics[0].metric("Đường ống tổng", f"{last['flow_main']:.2f} L/min")
+metrics[1].metric("Zone 1", f"{last['flow_z1']:.2f} L/min")
+metrics[2].metric("Zone 2", f"{last['flow_z2']:.2f} L/min")
+metrics[3].metric("Residual", f"{last['residual']:+.2f} L/min")
+
+section_title("Bộ lọc hiển thị", f"{len(df):,} mẫu đã tải")
+f1, f2 = st.columns([1, 2])
+with f1:
+    channels = st.multiselect(
+        "Kênh lưu lượng",
+        ["flow_main", "flow_z1", "flow_z2"],
+        default=["flow_main", "flow_z1", "flow_z2"],
+        format_func=lambda x: {"flow_main": "Đường ống tổng", "flow_z1": "Zone 1", "flow_z2": "Zone 2"}[x],
+    )
+with f2:
+    date_min = df["ts_server"].min().date()
+    date_max = df["ts_server"].max().date()
+    date_range = st.date_input("Khoảng ngày (UTC)", value=(date_min, date_max), min_value=date_min, max_value=date_max)
+
+filtered = df.copy()
+if isinstance(date_range, (tuple, list)) and len(date_range) == 2:
+    start_date, end_date = date_range
+    filtered = filtered[
+        (filtered["ts_server"].dt.date >= start_date) &
+        (filtered["ts_server"].dt.date <= end_date)
+    ]
+
+if filtered.empty:
+    empty_state("Không có mẫu trong bộ lọc", "Thay đổi khoảng ngày để xem lại dữ liệu.")
+else:
+    section_title("Biểu đồ lưu lượng", "Đơn vị: lít/phút")
+    if channels:
+        labels = {"flow_main": "Main", "flow_z1": "Zone 1", "flow_z2": "Zone 2"}
+        chart = filtered.set_index("ts_server")[channels].rename(columns=labels)
+        st.line_chart(chart, height=360)
+    else:
+        st.info("Chọn ít nhất một kênh để hiển thị biểu đồ.")
+    section_title("Sai lệch cân bằng", "Residual = Main − Zone 1 − Zone 2")
+    st.line_chart(filtered.set_index("ts_server")[["residual"]], height=210)
+    avg_abs = filtered["residual"].abs().mean()
+    max_abs = filtered["residual"].abs().max()
+    a, b, c = st.columns(3)
+    a.metric("Residual trung bình tuyệt đối", f"{avg_abs:.3f} L/min")
+    b.metric("Residual tuyệt đối lớn nhất", f"{max_abs:.3f} L/min")
+    c.metric("Số mẫu đang xem", f"{len(filtered):,}")
+    st.caption("Residual có thể chịu ảnh hưởng của sai số cảm biến, hiệu chuẩn, độ trễ và vị trí lắp đặt; không dùng riêng chỉ số này để kết luận rò rỉ.")
+
+    section_title("Bảng dữ liệu", "Các mẫu mới nhất được hiển thị trước")
+    table = filtered.sort_values("id", ascending=False).copy()
+    table["ts_server"] = table["ts_server"].dt.strftime("%Y-%m-%d %H:%M:%S UTC")
+    st.dataframe(table, use_container_width=True, hide_index=True, height=360)
+    st.download_button(
+        "↓ Xuất dữ liệu CSV",
+        data=filtered.to_csv(index=False).encode("utf-8-sig"),
+        file_name="water_telemetry_history.csv",
+        mime="text/csv",
+        use_container_width=False,
+    )
+
+st.caption("Nguồn dữ liệu: SQLite telemetry. Dữ liệu lịch sử có thể bao gồm mẫu chưa xác minh hoặc đã đánh dấu kịch bản.")
