@@ -78,14 +78,13 @@ if filtered.empty:
     empty_state("Không có mẫu trong bộ lọc", "Thay đổi khoảng ngày để xem lại dữ liệu.")
 else:
     st.caption("Các chỉ số bên dưới được tính từ mẫu cuối trong khoảng ngày đang chọn (UTC).")
-    last = df.iloc[-1]
+    last = filtered.iloc[-1]
     metrics = st.columns(4)
     metrics[0].metric("Đường ống tổng", f"{last['flow_main']:.2f} L/min")
     metrics[1].metric("Zone 1", f"{last['flow_z1']:.2f} L/min")
     metrics[2].metric("Zone 2", f"{last['flow_z2']:.2f} L/min")
     metrics[3].metric("Residual", f"{last['residual']:+.2f} L/min")
-    
-    
+
     section_title("Biểu đồ lưu lượng", "Đơn vị: lít/phút")
     if channels:
         labels = {"flow_main": "Main", "flow_z1": "Zone 1", "flow_z2": "Zone 2"}
