@@ -17,9 +17,8 @@ from tools.alert_service import DEFAULT_DB, get_actions, get_summary, list_alert
 
 apply_theme()
 page_header(
-    "Trung tâm cảnh báo",
+    "Cảnh báo",
     "Tiếp nhận, phân loại, xác nhận và đóng sự cố. Mọi thao tác đều được lưu trong nhật ký để truy vết.",
-    tag="ALERT OPERATIONS CENTER",
 )
 
 try:
@@ -36,13 +35,12 @@ metrics[3].metric("Tổng sự kiện", summary["total"])
 
 actions_col, info_col = st.columns([1, 4])
 with actions_col:
-    if st.button("↻ Làm mới", use_container_width=True):
+    if st.button("Làm mới", use_container_width=True):
         st.rerun()
 with info_col:
-    st.markdown(
-        '<div class="soft-note">Alert Engine chỉ lưu và quản lý quyết định do bộ phát hiện gửi đến. '
-        'Trang này không tự suy luận rò rỉ, không tự chạy AI và không chuyển dữ liệu giả lập thành cảnh báo thực.</div>',
-        unsafe_allow_html=True,
+    st.caption(
+        "Trang này quản lý sự cố đã được hệ thống ghi nhận; không tự chạy AI "
+        "hoặc xác nhận nguồn dữ liệu vật lý."
     )
 
 section_title("Danh sách sự cố", "Lọc theo trạng thái, zone, mức độ hoặc từ khóa")
@@ -97,7 +95,7 @@ st.dataframe(
     height=330,
 )
 st.download_button(
-    "↓ Xuất danh sách CSV",
+    "Xuất danh sách CSV",
     data=view[[column for column in columns if column in view.columns]].to_csv(index=False).encode("utf-8-sig"),
     file_name="projectII_alerts.csv",
     mime="text/csv",
@@ -160,7 +158,7 @@ try:
         action_df = pd.DataFrame(action_rows)
         st.dataframe(action_df, use_container_width=True, hide_index=True)
         st.download_button(
-            "↓ Xuất nhật ký thao tác",
+            "Xuất nhật ký thao tác",
             data=action_df.to_csv(index=False).encode("utf-8-sig"),
             file_name=f"alert_{selected_id}_audit.csv",
             mime="text/csv",
