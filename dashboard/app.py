@@ -9,7 +9,8 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from dashboard.ui import apply_theme, empty_state, page_header, section_title
+from dashboard.ui import (FLOW_COLORS, RESIDUAL_COLOR, apply_theme, empty_state,
+                          page_header, section_title)
 from dashboard.data_filters import prepare_telemetry_history, filter_telemetry_dates
 
 DB = ROOT / "data" / "water.db"
@@ -18,7 +19,6 @@ apply_theme()
 page_header(
     "Lưu lượng & lịch sử đo",
     "Theo dõi biến thiên của đường ống tổng và hai zone, đối chiếu cân bằng lưu lượng và xuất dữ liệu phục vụ phân tích.",
-    tag="TELEMETRY EXPLORER",
 )
 
 @st.cache_data(ttl=3)
@@ -40,7 +40,7 @@ top = st.columns([1, 1, 3])
 with top[0]:
     row_limit = st.selectbox("Số mẫu tải", [100, 300, 600, 1200, 3000], index=2)
 with top[1]:
-    if st.button("↻ Làm mới dữ liệu", use_container_width=True):
+    if st.button("Làm mới", use_container_width=True):
         st.cache_data.clear()
         st.rerun()
 
@@ -77,7 +77,7 @@ filtered = filter_telemetry_dates(df, date_range)
 if filtered.empty:
     empty_state("Không có mẫu trong bộ lọc", "Thay đổi khoảng ngày để xem lại dữ liệu.")
 else:
-    st.caption("Các chỉ số bên dưới được tính từ mẫu cuối trong khoảng ngày đang chọn (UTC).")
+    st.caption("Mẫu cuối trong khoảng UTC đã chọn.")
     last = filtered.iloc[-1]
     metrics = st.columns(4)
     metrics[0].metric("Đường ống tổng", f"{last['flow_main']:.2f} L/min")
@@ -85,15 +85,15 @@ else:
     metrics[2].metric("Zone 2", f"{last['flow_z2']:.2f} L/min")
     metrics[3].metric("Residual", f"{last['residual']:+.2f} L/min")
 
-    section_title("Biểu đồ lưu lượng", "Đơn vị: lít/phút")
+    section_title("Lưu lượng theo thời gian", "Lít/phút · UTC")
     if channels:
         labels = {"flow_main": "Main", "flow_z1": "Zone 1", "flow_z2": "Zone 2"}
         chart = filtered.set_index("ts_server")[channels].rename(columns=labels)
-        st.line_chart(chart, height=360)
+        st.line_chart(chart, height=360, color=[FLOW_COLORS[["flow_main", "flow_z1", "flow_z2"].index(key)] for key in channels])
     else:
         st.info("Chọn ít nhất một kênh để hiển thị biểu đồ.")
     section_title("Sai lệch cân bằng", "Residual = Main − Zone 1 − Zone 2")
-    st.line_chart(filtered.set_index("ts_server")[["residual"]], height=210)
+    st.line_chart(filtered.set_index("ts_server")[["residual"]], height=230, color=RESIDUAL_COLOR)
     avg_abs = filtered["residual"].abs().mean()
     max_abs = filtered["residual"].abs().max()
     a, b, c = st.columns(3)
@@ -107,7 +107,7 @@ else:
     table["ts_server"] = table["ts_server"].dt.strftime("%Y-%m-%d %H:%M:%S UTC")
     st.dataframe(table, use_container_width=True, hide_index=True, height=360)
     st.download_button(
-        "↓ Xuất dữ liệu CSV",
+        "Xuất CSV",
         data=filtered.to_csv(index=False).encode("utf-8-sig"),
         file_name="water_telemetry_history.csv",
         mime="text/csv",

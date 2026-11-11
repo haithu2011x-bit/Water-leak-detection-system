@@ -8,7 +8,8 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from dashboard.ui import apply_theme, empty_state, page_header, section_title, status_chip
+from dashboard.ui import (RESIDUAL_COLOR, apply_theme, empty_state,
+                          page_header, section_title, status_chip)
 from dashboard.data_filters import filter_quality_log
 from tools.unified_dashboard_service import age_seconds, quality_log_snapshot
 
@@ -16,12 +17,11 @@ apply_theme()
 page_header(
     "Chất lượng dữ liệu & kết nối",
     "Theo dõi nhật ký MQTT, bản tin lỗi, mẫu đánh dấu giả lập và các dấu hiệu gián đoạn trong chuỗi telemetry.",
-    tag="DATA QUALITY MONITOR",
 )
 
 top = st.columns([1, 4])
 with top[0]:
-    if st.button("↻ Làm mới nhật ký", use_container_width=True):
+    if st.button("Làm mới", use_container_width=True):
         st.rerun()
 
 try:
@@ -84,7 +84,7 @@ if invalid_count:
 if sim_count:
     st.info(f"Có {sim_count} bản tin được đánh dấu mô phỏng; không dùng chúng làm bằng chứng thực nghiệm.")
 
-section_title("Phân tích nhật ký", "Lọc nhanh theo loại bản tin và nội dung")
+section_title("Nhật ký bản tin", "Lọc theo loại và tìm kiếm nội dung")
 filter_col, search_col = st.columns([1, 2])
 with filter_col:
     kind_options = sorted(kinds.unique().tolist())
@@ -102,11 +102,11 @@ if "received_utc" in filtered.columns:
         chart_source = chart_source.dropna(subset=["missing_samples_cumulative"])
         if not chart_source.empty:
             st.markdown("**Số mẫu thiếu tích lũy theo thời gian**")
-            st.line_chart(chart_source.set_index("received_utc")[["missing_samples_cumulative"]], height=220)
+            st.line_chart(chart_source.set_index("received_utc")[["missing_samples_cumulative"]], height=240, color=RESIDUAL_COLOR)
 
 st.dataframe(filtered.tail(300).iloc[::-1], use_container_width=True, hide_index=True, height=390)
 st.download_button(
-    "↓ Xuất nhật ký CSV",
+    "Xuất nhật ký CSV",
     data=filtered.to_csv(index=False).encode("utf-8-sig"),
     file_name="mqtt_quality_log.csv",
     mime="text/csv",

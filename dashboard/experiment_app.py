@@ -8,7 +8,8 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from dashboard.ui import apply_theme, empty_state, page_header, section_title, status_chip
+from dashboard.ui import (FLOW_COLORS, RESIDUAL_COLOR, apply_theme,
+                          empty_state, page_header, section_title, status_chip)
 from tools.experiment_log import SCENARIOS
 from tools.experiment_service import (
     DEFAULT_DB, list_sessions, sample_rows, session_quality, start_session,
@@ -19,7 +20,6 @@ apply_theme()
 page_header(
     "Quản lý phiên thí nghiệm",
     "Thiết lập kịch bản, ghi nhận điều kiện vận hành, theo dõi chất lượng mẫu và xuất bộ dữ liệu của từng lần thử.",
-    tag="EXPERIMENT WORKSPACE",
 )
 
 try:
@@ -47,7 +47,7 @@ with status_col:
         status_chip("Chưa đủ điều kiện bắt đầu phiên REAL", "warn")
         st.caption(" ".join(stream["reasons"][:3]))
 with refresh_col:
-    if st.button("↻ Làm mới", use_container_width=True):
+    if st.button("Làm mới", use_container_width=True):
         st.rerun()
 
 tabs = st.tabs(["Tổng quan", "Phiên đo", "Lịch sử & chất lượng", "Danh mục kịch bản"])
@@ -67,27 +67,13 @@ with tabs[0]:
             st.caption(active.get("start_note") or "Không có ghi chú bắt đầu.")
         else:
             st.info("Hiện không có phiên thí nghiệm đang chạy.")
+    st.caption("Phiên REAL cần kiểm tra luồng ESP32 v2 và xác nhận của người vận hành; định dạng dữ liệu không tự chứng minh nguồn vật lý.")
+    section_title("Quy trình đo")
     st.markdown(
-        '<div class="soft-note">Một phiên chỉ được ghi nhận là REAL khi luồng ESP32 v2 đáp ứng điều kiện kiểm tra, '
-        'người vận hành xác nhận đã dừng fake_sensor và dữ liệu được ghi trong khoảng thời gian của phiên.</div>',
-        unsafe_allow_html=True,
+        "**01 · Kiểm tra luồng**  →  **02 · Chọn kịch bản**  →  "
+        "**03 · Ghi phiên**  →  **04 · Đánh giá & xuất dữ liệu**"
     )
-    section_title("Các bước vận hành")
-    flow = st.columns(4)
-    for col, number, heading, detail in [
-        (flow[0], "01", "Kiểm tra luồng", "Kiểm tra ESP32 v2 và thời gian nhận mẫu."),
-        (flow[1], "02", "Chọn kịch bản", "Chọn trạng thái van, nhánh và điều kiện đo."),
-        (flow[2], "03", "Ghi phiên", "Bắt đầu, ghi chú và kết thúc phiên đo."),
-        (flow[3], "04", "Đánh giá", "Kiểm tra chất lượng và xuất CSV hợp lệ."),
-    ]:
-        with col:
-            st.markdown(
-                f'<div style="background:#fff;border:1px solid #e5ebf3;border-radius:14px;padding:15px;min-height:135px">'
-                f'<div style="color:#2868d7;font-size:.76rem;font-weight:800">{number}</div>'
-                f'<div style="font-weight:750;color:#17243b;margin:8px 0 5px">{heading}</div>'
-                f'<div style="font-size:.82rem;color:#68778f;line-height:1.45">{detail}</div></div>',
-                unsafe_allow_html=True,
-            )
+    st.caption("Kiểm tra cấu trúc và thời gian mẫu trước khi ghi phiên; đánh giá chất lượng sau khi kết thúc.")
     section_title("Phiên gần đây")
     if sessions:
         recent = pd.DataFrame(sessions[:8])
@@ -99,11 +85,9 @@ with tabs[0]:
 with tabs[1]:
     section_title("Điều khiển phiên", "Mỗi thời điểm chỉ cho phép một phiên đang mở")
     if active:
-        st.markdown(
-            f'<div class="soft-note"><b>Đang ghi phiên #{active["id"]} · {active["scenario_code"]}</b><br>'
-            f'Bắt đầu lúc: {active["start_utc"]}<br>Ghi chú: {active.get("start_note") or "—"}</div>',
-            unsafe_allow_html=True,
-        )
+        status_chip(f"Đang ghi phiên #{active['id']} · {active['scenario_code']}", "warn")
+        st.caption(f"Bắt đầu: {active['start_utc']}")
+        st.write(active.get("start_note") or "Chưa có ghi chú bắt đầu.")
         with st.form("stop_form", clear_on_submit=True):
             end_note = st.text_area("Ghi chú kết thúc", placeholder="Trạng thái van/bơm, điều kiện đo, sự cố...")
             submitted_stop = st.form_submit_button("Kết thúc phiên", type="primary", use_container_width=True)
@@ -148,7 +132,7 @@ with tabs[1]:
             view = view[view["end_utc"].notna()]
         st.dataframe(view, use_container_width=True, hide_index=True, height=340)
         st.download_button(
-            "↓ Xuất danh sách phiên CSV",
+            "Xuất danh sách phiên CSV",
             data=view.to_csv(index=False).encode("utf-8-sig"),
             file_name="experiment_sessions.csv",
             mime="text/csv",
@@ -184,10 +168,10 @@ with tabs[2]:
             frame["ts_server"] = pd.to_datetime(frame["ts_server"], utc=True, errors="coerce")
             frame = frame.dropna(subset=["ts_server"])
             st.markdown("**Diễn biến ba kênh lưu lượng**")
-            st.line_chart(frame.set_index("ts_server")[["flow_main", "flow_z1", "flow_z2"]], height=300)
+            st.line_chart(frame.set_index("ts_server")[["flow_main", "flow_z1", "flow_z2"]], height=300, color=list(FLOW_COLORS))
             frame["residual"] = frame["flow_main"] - frame["flow_z1"] - frame["flow_z2"]
             st.markdown("**Sai lệch cân bằng lưu lượng**")
-            st.line_chart(frame.set_index("ts_server")[["residual"]], height=190)
+            st.line_chart(frame.set_index("ts_server")[["residual"]], height=210, color=RESIDUAL_COLOR)
             with st.expander("Xem dữ liệu chi tiết"):
                 st.dataframe(frame.tail(500).iloc[::-1], use_container_width=True, hide_index=True)
         if q["limit_reached"]:
@@ -196,7 +180,7 @@ with tabs[2]:
             try:
                 csv_data = export_verified_session_csv(session_id=sid)
                 st.download_button(
-                    "↓ Xuất bộ dữ liệu phiên đã hoàn tất",
+                    "Xuất bộ dữ liệu phiên đã hoàn tất",
                     data=csv_data,
                     file_name=f"projectII_experiment_{sid}.csv",
                     mime="text/csv",
