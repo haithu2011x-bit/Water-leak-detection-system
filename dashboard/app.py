@@ -10,6 +10,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from dashboard.ui import apply_theme, empty_state, page_header, section_title
+from dashboard.data_filters import prepare_telemetry_history, filter_telemetry_dates
 
 DB = ROOT / "data" / "water.db"
 
@@ -24,7 +25,7 @@ page_header(
 def load_data(limit: int) -> pd.DataFrame:
     if not DB.is_file():
         return pd.DataFrame()
-    with sqlite3.connect(DB) as con:
+    with sqlite3.connect(DB.resolve().as_uri() + "?mode=ro", uri=True, timeout=5) as con:
         frame = pd.read_sql_query(
             """
             SELECT id, ts_server, flow_main, flow_z1, flow_z2, label, scenario_id
@@ -43,26 +44,19 @@ with top[1]:
         st.cache_data.clear()
         st.rerun()
 
-df = load_data(row_limit)
+try:
+    df = load_data(row_limit)
+except (sqlite3.Error, OSError, ValueError) as exc:
+    st.error(f"Không thể đọc dữ liệu telemetry: {exc}")
+    st.stop()
 if df.empty:
     empty_state("Chưa có telemetry", "Kiểm tra Collector, MQTT broker hoặc kết nối USB Serial. Không dùng dữ liệu giả để thay thế số đo thật.")
     st.stop()
 
-df["ts_server"] = pd.to_datetime(df["ts_server"], utc=True, errors="coerce")
-for key in ("flow_main", "flow_z1", "flow_z2"):
-    df[key] = pd.to_numeric(df[key], errors="coerce")
-df = df.dropna(subset=["ts_server", "flow_main", "flow_z1", "flow_z2"]).copy()
-df["residual"] = df["flow_main"] - df["flow_z1"] - df["flow_z2"]
+df = prepare_telemetry_history(df)
 if df.empty:
     st.warning("Có bản ghi nhưng không có mẫu hợp lệ để vẽ biểu đồ.")
     st.stop()
-
-last = df.iloc[-1]
-metrics = st.columns(4)
-metrics[0].metric("Đường ống tổng", f"{last['flow_main']:.2f} L/min")
-metrics[1].metric("Zone 1", f"{last['flow_z1']:.2f} L/min")
-metrics[2].metric("Zone 2", f"{last['flow_z2']:.2f} L/min")
-metrics[3].metric("Residual", f"{last['residual']:+.2f} L/min")
 
 section_title("Bộ lọc hiển thị", f"{len(df):,} mẫu đã tải")
 f1, f2 = st.columns([1, 2])
@@ -78,17 +72,19 @@ with f2:
     date_max = df["ts_server"].max().date()
     date_range = st.date_input("Khoảng ngày (UTC)", value=(date_min, date_max), min_value=date_min, max_value=date_max)
 
-filtered = df.copy()
-if isinstance(date_range, (tuple, list)) and len(date_range) == 2:
-    start_date, end_date = date_range
-    filtered = filtered[
-        (filtered["ts_server"].dt.date >= start_date) &
-        (filtered["ts_server"].dt.date <= end_date)
-    ]
+filtered = filter_telemetry_dates(df, date_range)
 
 if filtered.empty:
     empty_state("Không có mẫu trong bộ lọc", "Thay đổi khoảng ngày để xem lại dữ liệu.")
 else:
+    st.caption("Các chỉ số bên dưới được tính từ mẫu cuối trong khoảng ngày đang chọn (UTC).")
+    last = filtered.iloc[-1]
+    metrics = st.columns(4)
+    metrics[0].metric("Đường ống tổng", f"{last['flow_main']:.2f} L/min")
+    metrics[1].metric("Zone 1", f"{last['flow_z1']:.2f} L/min")
+    metrics[2].metric("Zone 2", f"{last['flow_z2']:.2f} L/min")
+    metrics[3].metric("Residual", f"{last['residual']:+.2f} L/min")
+
     section_title("Biểu đồ lưu lượng", "Đơn vị: lít/phút")
     if channels:
         labels = {"flow_main": "Main", "flow_z1": "Zone 1", "flow_z2": "Zone 2"}
