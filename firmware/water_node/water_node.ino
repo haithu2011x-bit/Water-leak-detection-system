@@ -1,6 +1,6 @@
 /*
   Project II | ESP32-WROOM-32 + 3 YF-S401 | Flow-only v1
-  - MAIN GPIO27, Z1 GPIO26, Z2 GPIO25
+  - MAIN GPIO25, Z1 GPIO26, Z2 GPIO27
   - Publish topic: building/water/node1/telemetry
   - JSON v2 adds device_id, boot_id, seq to the existing four fields.
   - seq increases every 1-second sampling window, even when MQTT is offline.
@@ -31,9 +31,9 @@ const char* MQTT_TOPIC = "building/water/node1/telemetry";
 
 // GPIOs are configured as INPUT because a suitable external 3.3V signal
 // conditioning circuit is REQUIRED and must deliver defined HIGH/LOW levels.
-constexpr uint8_t PIN_MAIN = 27;
+constexpr uint8_t PIN_MAIN = 25;
 constexpr uint8_t PIN_Z1 = 26;
-constexpr uint8_t PIN_Z2 = 25;
+constexpr uint8_t PIN_Z2 = 27;
 constexpr uint32_t SAMPLE_INTERVAL_MS = 1000;
 constexpr uint32_t RECONNECT_INTERVAL_MS = 5000;
 const char* DEVICE_ID = "water-node-01";

@@ -5,7 +5,7 @@ constexpr bool CALIBRATION_MODE = true;
 constexpr float PULSES_PER_LITER_MAIN = 0.0f;
 constexpr float PULSES_PER_LITER_Z1 = 0.0f;
 constexpr float PULSES_PER_LITER_Z2 = 0.0f;
-constexpr uint8_t PIN_MAIN = 27, PIN_Z1 = 26, PIN_Z2 = 25;
+constexpr uint8_t PIN_MAIN = 25, PIN_Z1 = 26, PIN_Z2 = 27;
 constexpr uint32_t SAMPLE_INTERVAL_MS = 1000;
 const char* DEVICE_ID = "water-node-01";
 portMUX_TYPE flowMux = portMUX_INITIALIZER_UNLOCKED;

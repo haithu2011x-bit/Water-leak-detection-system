@@ -3,8 +3,8 @@
 ## Khi nao chon phuong an nay
 
 Mo hinh hai zone song song tren ban thi nghiem co 3 YF-S401 (Main, Z1, Z2),
-ESP32-WROOM-32D CP2102 Type-C, 4 van (2 su dung, 2 tao ro). Khong dung cam
-bien ap suat. Cam bien hai nhanh nam **truoc vi tri van ro**.
+ESP32-WROOM-32D CP2102 Type-C, 2 van tao ro theo mo hinh hien tai. Khong dung cam
+bien ap suat. Cam bien hai nhanh nam **sau diem re tao ro**.
 
 USB Serial giup ESP32 vua nhan nguon 5V tu laptop, vua gui so lieu ve Python.
 Khong can Wi-Fi, Mosquitto hay thu vien PubSubClient. **Bom 12V van phai co
@@ -64,8 +64,10 @@ lap `device_id/boot_id/seq`. SQLite cu va cot `pressure_mv` lich su duoc giu.
 ## Luu y nghien cuu
 
 - USB chi la cach truyen du lieu, khong tu lam tang do chinh xac YF-S401.
-- Khi F1/F2 nam truoc van ro, `F0 - F1 - F2` co the van gan 0 du co ro phia
-  sau cam bien. Can doi chung cac trang thai su dung/ro va danh gia sai so.
+- Voi mo hinh hien tai, diem tao ro nam truoc F1/F2.
+  Khi dong chay on dinh, `F0 - F1 - F2` uoc tinh tong luu luong ro.
+  Can hieu chuan, do dung sai va kiem chung bang nuoc that.
+  Residual khong tu xac dinh chinh xac nhanh ro.
 - JSON giong ESP32 va cap USB khong phai bang chung du lieu do tu nuoc that;
   van can anh, nhat ky do, xac nhan nguoi van hanh va tap test doc lap.
 - `CALIBRATION_MODE = true` khong gui JSON L/min, do do collector se khong
