@@ -1,0 +1,10 @@
+sensor_id,zone,trial,volume_ml,measured_pulses,pulses_per_liter,notes
+MAIN,main,1,,,,
+MAIN,main,2,,,,
+MAIN,main,3,,,,
+Z1,zone1,1,,,,
+Z1,zone1,2,,,,
+Z1,zone1,3,,,,
+Z2,zone2,1,,,,
+Z2,zone2,2,,,,
+Z2,zone2,3,,,,
